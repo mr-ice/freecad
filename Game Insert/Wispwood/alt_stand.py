@@ -296,8 +296,10 @@ def build_leg():
     """Build the prop leg, nested inside the shelf-plate pocket, free except for the hinge.
 
     A flat bar (``Z`` in ``[0, ALT_LEG_THICK]``, on the back of the plate) running from the
-    hinge up the shelf, ending in a flattened-cylinder **T** for locking upright. Its end of
-    the print-in-place hinge is a set of knuckles bored to ride the plate's pin; the bar is
+    hinge up the shelf, ending in a flattened-cylinder **T** for locking upright; a tongue
+    stub under the T centre engages the base-crossbar notch when the triangle is deployed. Its
+    end of the print-in-place hinge is a set of knuckles bored to ride the plate's pin; the bar
+    is
     notched clear of the plate knuckles. Built in the assembled (folded-in) position with all
     the hinge/pocket clearances, so it prints in place without fusing to the shelf.
 
@@ -420,8 +422,10 @@ def build_base():
 
     The legs flank the prop leg in the central opening, stop short of its T, and keep only
     their back ~47% where they cross the lip band. The crossbar sits high (just below the leg
-    tops) and is thinned to its back ~47% where it passes under the prop leg. The leg knuckles
-    ride the shelf's pins. Free of the shelf except via the hinges.
+    tops) and is thinned to its back ~47% where it passes under the prop leg. A central notch
+    in the crossbar top edge receives the prop-leg tongue when the triangle is deployed
+    (upright-lock). The leg knuckles ride the shelf's pins. Free of the shelf except via the
+    hinges.
 
     Returns
     -------
