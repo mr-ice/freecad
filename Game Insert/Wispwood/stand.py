@@ -117,6 +117,13 @@ def _yz_prism(pts_yz, x0, dx):
     return Part.Face(Part.makePolygon(verts)).extrude(Vector(dx, 0.0, 0.0))
 
 
+def _xz_prism(pts_xz, y0, dy):
+    """Extrude a closed X-Z polygon (list of ``(x, z)``) ``dy`` along ``+Y`` from ``y0``."""
+    verts = [Vector(x, y0, z) for x, z in pts_xz]
+    verts.append(verts[0])
+    return Part.Face(Part.makePolygon(verts)).extrude(Vector(0.0, dy, 0.0))
+
+
 def _corner(cx, cy, start_deg):
     """Return a quarter-torus frame fillet (path radius ``CR``, tube ``ROD_R``) at a corner."""
     elbow = Part.makeTorus(
@@ -154,7 +161,26 @@ def _tray_lip():
         post = _box(x_lo, ly, T, x_hi - x_lo, lt, h_edge)
         post = post.cut(_ycyl(r_f, lt + 2.0, fg, ly - 1.0, T + h_edge))  # fillet down to fg
         lip = lip.fuse(post)
-    return lip
+
+    # Clearance so the lip does not fuse to the leg hinge passing under it: raise the lip
+    # underside by ALT_LIP_LEG_GAP over the leg width, with angled lead-ins for printing.
+    g = cfg.ALT_LIP_LEG_GAP
+    rmp = cfg.ALT_LIP_LEG_RAMP
+    lx0 = LEG_CX - LEG_W / 2.0 - 1.0
+    lx1 = LEG_CX + LEG_W / 2.0 + 1.0
+    cutter = _xz_prism(
+        [
+            (lx0 - rmp, T - 1.0),
+            (lx1 + rmp, T - 1.0),
+            (lx1 + rmp, T),
+            (lx1, T + g),
+            (lx0, T + g),
+            (lx0 - rmp, T),
+        ],
+        ly - 1.0,
+        lt + 2.0,
+    )
+    return lip.cut(cutter)
 
 
 def build_shelf():

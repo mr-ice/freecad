@@ -141,6 +141,8 @@ ALT_FRAME_CORNER_R = 8.0  # shelf frame corner radius (continuous rounded rod pa
 ALT_LIP_EDGE_FRAC = 0.55  # tray lip height at the shelf edges, as a fraction of tray height
 ALT_LIP_LOW_H = 3.0  # tray lip height at the finger-groove centres (low, to clear scoops)
 ALT_LIP_T = 3.0  # tray lip thickness (along Y)
+ALT_LIP_LEG_GAP = 0.4  # clearance under the lip over the leg hinge (so they don't fuse); 2 layers
+ALT_LIP_LEG_RAMP = 3.0  # run of the angled lead-in up to that gap (gentle, prints at 0.2 mm)
 
 SHOW_ALT_STAND = True
 ALT_SHELF_THICKNESS = 7.0  # shelf plate thickness (the leg nests fully inside this, not the lips)
