@@ -22,7 +22,7 @@ TILE_DEPTH_CLEARANCE = 1.0  # extra pocket depth above the tile height
 
 # --- Pockets (derived) -------------------------------------------------------
 POCKET_WIDTH = TILE_SIZE + 2 * TILE_SIDE_CLEARANCE  # ~38
-POCKET_LENGTH = TILES_PER_STACK * TILE_THICKNESS + STACK_LENGTH_SLACK # ~178.64
+POCKET_LENGTH = TILES_PER_STACK * TILE_THICKNESS + STACK_LENGTH_SLACK  # ~178.64
 POCKET_DEPTH = TILE_SIZE + TILE_DEPTH_CLEARANCE  # ~37
 
 # --- Walls / structure -------------------------------------------------------
@@ -167,7 +167,7 @@ ALT_STAND_TRANSPARENCY = 0  # FreeCAD view only
 
 # --- Tolerances / print ------------------------------------------------------
 GENERAL_CLEARANCE = 0.2  # default fit clearance for mating printed parts
-MAX_PRINTER_DIMENSION = 240.0  # build-plate limit; keep parts within this (MK4 : 240, XL : 350)
+MAX_PRINTER_DIMENSION = 350.0  # build-plate limit; XL bed (MK4 : 240, XL : 350)
 
 # --- Display (FreeCAD view only; no effect on geometry or the print) ---------
 # Percent transparency (0 opaque .. 100 invisible) applied to the tray and lid parts so the
@@ -177,3 +177,62 @@ TRAY_LID_TRANSPARENCY = 80
 # position, for visual comparison against the folded stand. Display-only -- do not export it.
 SHOW_STAND_DEPLOYED = True
 STAND_DEPLOYED_TRANSPARENCY = 55  # ghost transparency so it reads as a reference, not a part
+
+# --- Box insert --------------------------------------------------------------
+# The retail box holds the Wispwood tray plus the rest of the game. Flat cardboard
+# (board pieces, markers, paw, score pad, booklet) is the same stock as the tree tiles.
+BOX_W = 185.0  # box interior width (X)
+BOX_L = 265.0  # box interior length (Y)
+BOX_H = 65.0  # box interior height (Z)
+STOCK_THICKNESS = TILE_THICKNESS  # all flat cardboard stock (~2.133)
+
+# Cat tokens: double tree-tile thickness, stored ON EDGE (35x35 face vertical).
+CAT_COUNT = 6
+CAT_SIZE = TILE_SIZE  # 35 square
+CAT_THICKNESS = 2 * TILE_THICKNESS  # ~4.266
+
+# Card deck (unsleeved).
+CARD_W = 63.0
+CARD_H = 88.0
+CARD_DECK_THICKNESS = 7.35
+
+# Round tokens.
+ROUND_TOKEN_DIA = 34.0
+ROUND_TOKEN_COUNT = 8
+ROUND_TOKEN_THICKNESS = TILE_THICKNESS
+
+# Markers: tall flat standees (~6x tree-token height).
+MARKER_W = 34.0
+MARKER_H = 214.0
+MARKER_COUNT = 4
+MARKER_THICKNESS = STOCK_THICKNESS
+
+# Board: 5 loose pieces (assembled it is 268 across, larger than the box).
+BOARD_CENTER_PTP = 135.0  # center octagon, point-to-point
+BOARD_PERIM_W = 86.0  # perimeter-piece bounding box (1/4 octagon)
+BOARD_PERIM_L = 190.0
+BOARD_PIECE_COUNT = 5
+BOARD_THICKNESS = STOCK_THICKNESS
+
+# 1st-player "paw" token.
+PAW_W = 70.0
+PAW_H = 64.0
+PAW_THICKNESS = STOCK_THICKNESS
+
+# Score pad and rules booklet (loose on top of the top tray).
+SCOREPAD_W = 103.0
+SCOREPAD_H = 218.0
+SCOREPAD_THICKNESS = 5.5
+BOOKLET_W = 170.0
+BOOKLET_H = 244.0
+BOOKLET_THICKNESS = 1.0
+
+# Insert tray construction.
+INSERT_WALL = 2.0  # well/divider wall thickness
+INSERT_FLOOR = 1.5  # tray floor thickness
+TOP_TRAY_DEPTH = 12.0  # top-tray height (board stack is the tallest content)
+SMALL_TRAY_RIM_Z = 42.0  # bottom-tray rim, matched to the Wispwood tray top
+COMPONENT_CLEARANCE = GENERAL_CLEARANCE  # per-side fit clearance for component wells
+
+# Folded alt stand must clear under the top tray (which rests at z = 42).
+ALT_STAND_MAX_FOLDED_H = 40.0
