@@ -190,9 +190,6 @@ ALT_CRADLE_OFFSET = 3.5  # height of the lock-cradle seat above the base centrel
 # end-cylinder locks here, on TOP of the base, so the deployed lock geometry is offset up by this
 ALT_LEG_BASE_GAP = 4.0  # in-plane gap between the prop leg and each base leg, so the leg-hinge
 # neck on the crossmember clears the base's pass-under cutout (was ~1.3 mm, too tight)
-ALT_LEG_GAP = (
-    0.6  # vertical gap where the leg crosses over the base crossmember (so they don't fuse)
-)
 
 # Base (the foot): a second print-in-place hinge centred in the shelf's bottom border (same
 # Ø7 knuckles / Ø3 pin, knuckles subdivided to match the prop-leg hinge). Two legs run up
