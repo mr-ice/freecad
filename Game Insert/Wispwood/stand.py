@@ -66,11 +66,20 @@ FG_XS = (_OFFSET + _PC_L, _OFFSET + _PC_R)
 SPLIT_LOW = (T - cfg.ALT_SPLIT_GAP) / 2.0
 SPLIT_HIGH = SPLIT_LOW + cfg.ALT_SPLIT_GAP
 
-# Lock line (computed from the leg-hinge height and length so the shelf locks at the angle).
+# Deployed triangle (centrelines): bottom hinge A, leg hinge H at distance S = D_LEG up the
+# shelf, cradle C at distance B along the base; angle at A is the deploy angle. By the law of
+# cosines (L the opposite side), with the cradle seat a height ALT_CRADLE_OFFSET above the base:
+#   B = S·cosθ + √(L² − (S·sinθ − h_c)²)
+# (the +cosθ root puts the foot forward under the leaning shelf). B < S + L by construction.
 _THETA = math.radians(cfg.STAND_DEPLOY_ANGLE)
-X_LOCK = math.sqrt(L_LEG**2 - (D_LEG * math.sin(_THETA)) ** 2) - D_LEG * math.cos(_THETA)
-BASE_CROSS_Y = HBY + X_LOCK
-BASE_LEN = X_LOCK + cfg.ALT_BASE_FOOT
+S_HINGES = D_LEG  # distance between the two hinges, along the shelf
+_HC = cfg.ALT_CRADLE_OFFSET
+B_BASE = S_HINGES * math.cos(_THETA) + math.sqrt(
+    L_LEG**2 - (S_HINGES * math.sin(_THETA) - _HC) ** 2
+)  # base hinge-to-cradle distance
+X_LOCK = B_BASE  # kept name for downstream offsets
+BASE_CROSS_Y = HBY + B_BASE  # cradle line (from the bottom hinge)
+BASE_LEN = B_BASE + cfg.ALT_BASE_FOOT
 NATIVE_Y_MIN = 0.0
 DISPLAY_X_OFFSET = W + 30.0
 
@@ -269,6 +278,8 @@ def build_all():
         return []
     assert L_LEG > D_LEG * math.sin(_THETA), "leg too short to reach the table at the lock angle"
     assert CROSS_Y + L_LEG < SHELF_H, "leg does not fit folded between the crossmember and top"
+    assert B_BASE < S_HINGES + L_LEG, "base reach B must be < S + L (degenerate triangle)"
+    assert HBY + BASE_LEN < SHELF_H, "base does not fit folded within the shelf height"
     tr = cfg.ALT_STAND_TRANSPARENCY
     parts = []
     for name, shape, rgb in (
