@@ -131,7 +131,8 @@ ALT_SNAP_CLEAR = 0.15  # snap interference (smaller = stronger click)
 # Rod-frame stand (per stand.md): shelf is a rounded rectangle of rod; base is an H hinged on
 # the shelf's bottom rod (necked to a pin); the leg hinges on the shelf crossmember and its
 # end-cylinder clicks into the base.
-ALT_ROD_R = 3.5  # frame rod radius (Ø7 rod)
+ALT_ROD_R = 4.5  # frame rod in-plane radius (Ø9), flattened to ALT_PART_T in Z for printing
+ALT_PART_T = 7.0  # part thickness in Z (a 7 mm cross-section trimmed from the Ø9 rod)
 ALT_CROSS_Y = 24.0  # shelf crossmember Y (tray sits here; the leg hinges on it)
 ALT_TRAY_LIP_H = 3.0  # lip height above the shelf face that catches the tray bottom edge
 ALT_BASE_FOOT = 12.0  # base length past the lock line (foot)
@@ -144,7 +145,7 @@ ALT_LIP_T = 3.0  # tray lip thickness (along Y)
 SHOW_ALT_STAND = True
 ALT_SHELF_THICKNESS = 7.0  # shelf plate thickness (the leg nests fully inside this, not the lips)
 ALT_SHELF_SIDE_CLEAR = 0.1  # per-side gap between the tray and the side lips
-ALT_SHELF_HEIGHT = 80.0  # shelf length the tray lies against (above the lip)
+ALT_SHELF_HEIGHT = 89.0  # shelf length; raised one rod-diameter above the leg so it clears the top
 # Frame extension below the cross-lip, down toward the base. Deployed, the shelf sits 15 deg
 # off vertical, so this is the SLANT length along the angled frame (vertical drop = x*cos15).
 # ~15 mm puts the top of the lip ~18 mm (slant) above the table so the tray's front-top edge
