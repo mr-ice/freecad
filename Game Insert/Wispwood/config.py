@@ -163,6 +163,8 @@ ALT_BASE_LEG_CLEAR = 3.0  # clearance from the prop leg and the slot walls
 ALT_BASE_T_GAP = 3.0  # base legs stop this far short of the prop T
 ALT_BASE_CROSS_WIDTH = 8.0  # crossbar length along the leg
 ALT_BASE_CROSS_INSET = 6.0  # crossbar pulled back from the base-leg tops (toward the hinge)
+ALT_LOCK_NOTCH_W = 9.0  # width of the T-catch notch in the base crossbar (>= ALT_LEG_T_DIA)
+ALT_LOCK_NOTCH_DEPTH = 3.0  # how deep the prop-leg T seats into the base crossbar
 ALT_STAND_TRANSPARENCY = 0  # FreeCAD view only
 
 # --- Tolerances / print ------------------------------------------------------

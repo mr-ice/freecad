@@ -46,6 +46,7 @@ Public API
 """
 
 import config as cfg
+import derived as d
 import Part
 from FreeCAD import Vector
 from wispwood import OUTER_WIDTH, WALL_TOP
@@ -338,6 +339,18 @@ def build_leg():
     )
     leg = leg.fuse(tcross)
 
+    # Upright-lock tongue: a stub under the T centre that drops into the base-crossbar notch.
+    tongue_w = cfg.ALT_LOCK_NOTCH_W - cfg.ALT_HINGE_AXIAL_CLEAR
+    tongue = _box(
+        SHELF_W / 2.0 - tongue_w / 2.0,
+        HINGE_Y + length - cfg.ALT_LEG_T_DIA / 2.0,
+        SPLIT_FRONT0,
+        tongue_w,
+        cfg.ALT_LEG_T_DIA,
+        LEG_LT - SPLIT_FRONT0,
+    )
+    leg = leg.fuse(tongue)
+
     # Keep only the front ~47% where the base crossbar passes under the prop leg (the crossbar
     # takes the back ~47%, with the split gap between, so they don't fuse).
     clr = cfg.ALT_BASE_LEG_CLEAR
@@ -473,6 +486,18 @@ def build_base():
             LEG_LT,
         )
     )
+    # Upright lock: a central notch in the crossbar top edge that the prop-leg T seats into,
+    # fixing the deployed triangle angle. Centred on the shelf width, sized to the T.
+    nx = SHELF_W / 2.0 - cfg.ALT_LOCK_NOTCH_W / 2.0
+    notch = _box(
+        nx,
+        BASE_CROSS_Y1 - cfg.ALT_LOCK_NOTCH_DEPTH,
+        -1.0,
+        cfg.ALT_LOCK_NOTCH_W,
+        cfg.ALT_LOCK_NOTCH_DEPTH + 1.0,
+        LEG_LT + 2.0,
+    )
+    cross = cross.cut(notch)
     return base.fuse(cross)
 
 
@@ -487,6 +512,9 @@ def build_all():
     """
     if not cfg.SHOW_ALT_STAND:
         return []
+    assert (
+        d.ALT_FOLDED_H <= cfg.ALT_STAND_MAX_FOLDED_H
+    ), f"folded stand {d.ALT_FOLDED_H:.1f} mm exceeds box bound {cfg.ALT_STAND_MAX_FOLDED_H} mm"
     tr = cfg.ALT_STAND_TRANSPARENCY
     parts = []
     for name, shape, rgb in (
