@@ -85,9 +85,16 @@ B_BASE = S_HINGES * math.cos(_THETA) + math.sqrt(
 )  # base hinge-to-cradle distance
 X_LOCK = B_BASE  # kept name for downstream offsets
 BASE_CROSS_Y = HBY + B_BASE  # cradle line (from the bottom hinge)
-BASE_LEN = B_BASE + cfg.ALT_BASE_FOOT
+LIP_EDGE_H = cfg.ALT_LIP_EDGE_FRAC * d.WALL_TOP  # deep-lip height at the edges (~55% tray height)
+# Base legs extend forward (toward the foot) by the lip depth, out past the shelf, as feet.
+BASE_LEN = B_BASE + cfg.ALT_BASE_FOOT + LIP_EDGE_H
 NATIVE_Y_MIN = 0.0
 DISPLAY_X_OFFSET = W + 30.0
+
+# Locating-peg X positions: inset from each tray edge (the tray is centred on the wider shelf),
+# shared with the tray divots so they register.
+_TRAY_OFFSET = (W - d.OUTER_WIDTH) / 2.0
+PEG_XS = (_TRAY_OFFSET + cfg.ALT_PEG_INSET, _TRAY_OFFSET + d.OUTER_WIDTH - cfg.ALT_PEG_INSET)
 
 
 def _box(x, y, z, dx, dy, dz):
@@ -148,17 +155,23 @@ def _necked_rod(y, x0, x1, necks):
 
 
 def _tray_lip():
-    """Return the tray lip: deep at the shelf edges, filleted down to the finger-groove dips."""
-    h_edge = cfg.ALT_LIP_EDGE_FRAC * d.WALL_TOP
+    """Return the tray lip: deep at the shelf edges, filleted to the finger-groove dips.
+
+    The edge posts extend ``ALT_LIP_DOWN`` below the shelf face to merge into the frame for a
+    smoother transition, and each carries a cone locating peg (angled sides so it prints) on its
+    top that seats in a matching tray divot.
+    """
+    h_edge = LIP_EDGE_H
     h_low = cfg.ALT_LIP_LOW_H
     lt = cfg.ALT_LIP_T
     ly = CROSS_Y - 1.0
     r_f = h_edge - h_low
+    down = cfg.ALT_LIP_DOWN
 
     lip = _box(ROD_R, ly, T, W - 2 * ROD_R, lt, h_low)  # low lip across the whole width
     for edge_x, fg in ((0.0, FG_XS[0]), (W, FG_XS[1])):
         x_lo, x_hi = min(edge_x, fg), max(edge_x, fg)
-        post = _box(x_lo, ly, T, x_hi - x_lo, lt, h_edge)
+        post = _box(x_lo, ly, T - down, x_hi - x_lo, lt, h_edge + down)  # extends down to the frame
         post = post.cut(_ycyl(r_f, lt + 2.0, fg, ly - 1.0, T + h_edge))  # fillet down to fg
         lip = lip.fuse(post)
 
@@ -180,7 +193,21 @@ def _tray_lip():
         ly - 1.0,
         lt + 2.0,
     )
-    return lip.cut(cutter)
+    lip = lip.cut(cutter)
+
+    # Locating pegs on top of each edge post (cone: angled sides print well, self-centre in the
+    # matching tray divot).
+    for px in PEG_XS:
+        lip = lip.fuse(
+            Part.makeCone(
+                cfg.ALT_LIP_PEG_R,
+                cfg.ALT_LIP_PEG_TOP_R,
+                cfg.ALT_LIP_PEG_H,
+                Vector(px, ly + lt / 2.0, T + h_edge),
+                Vector(0.0, 0.0, 1.0),
+            )
+        )
+    return lip
 
 
 def build_shelf():
@@ -232,19 +259,28 @@ def _lock_cradle(nc):
     to the base surface before the base end — strong, with a clean transition.
     """
     x0 = nc - BASE_LEG_W / 2.0
-    base_end = HBY + BASE_LEN
+    ramp_end = BASE_CROSS_Y + cfg.ALT_BASE_FOOT  # reinforce a foot-length past the cradle
     boss = _box(x0, BASE_CROSS_Y - ROD_R - 1.0, T, BASE_LEG_W, 2 * ROD_R + 2.0, ROD_R)
     seat = _xcyl(ROD_R + cfg.ALT_SNAP_CLEAR, BASE_LEG_W + 2.0, x0 - 1.0, BASE_CROSS_Y, T + ROD_R)
     cradle = boss.cut(seat)
     ramp_y0 = BASE_CROSS_Y + ROD_R + 1.0  # foot edge of the boss
-    ramp = _yz_prism([(ramp_y0, T), (base_end, T), (ramp_y0, T + ROD_R)], x0, BASE_LEG_W)
+    ramp = _yz_prism([(ramp_y0, T), (ramp_end, T), (ramp_y0, T + ROD_R)], x0, BASE_LEG_W)
     return cradle.fuse(ramp)
 
 
 def _base_leg(nc):
-    """Return one H leg (raw, unflattened): a bar continued onto its bored hinge cylinder."""
+    """Return one H leg (raw, unflattened): a bar continued onto its bored hinge cylinder.
+
+    The leg runs from the bottom hinge forward past the shelf (the foot extends out by the lip
+    depth via ``BASE_LEN``) and its free foot end is rounded like the other edges.
+    """
     x0 = nc - BASE_LEG_W / 2.0
-    bar = _box(x0, HBY, 0.0, BASE_LEG_W, BASE_LEN, T)  # from the hinge axis up
+    r = BASE_LEG_W / 2.0
+    foot_end = HBY + BASE_LEN
+    bar = _box(x0, HBY, 0.0, BASE_LEG_W, BASE_LEN - r, T)  # straight part
+    bar = bar.fuse(
+        Part.makeCylinder(r, T, Vector(nc, foot_end - r, 0.0), Vector(0, 0, 1))
+    )  # round foot
     leg = bar.fuse(_xcyl(ROD_R, BASE_LEG_W, x0, HBY, ZC))  # rounded hinge end
     leg = leg.cut(_xcyl(BORE, BASE_LEG_W + 2.0, x0 - 1.0, HBY, ZC))  # pin hole through both
     # 47/47: keep only the lower part where the leg passes under the shelf crossmember.
@@ -329,7 +365,7 @@ def build_all():
     assert L_LEG > D_LEG * math.sin(_THETA), "leg too short to reach the table at the lock angle"
     assert CROSS_Y + L_LEG < SHELF_H, "leg does not fit folded between the crossmember and top"
     assert B_BASE < S_HINGES + L_LEG, "base reach B must be < S + L (degenerate triangle)"
-    assert HBY + BASE_LEN < SHELF_H, "base does not fit folded within the shelf height"
+    # (the base foot intentionally extends past the shelf top now, so it is not bounded by SHELF_H)
     tr = cfg.ALT_STAND_TRANSPARENCY
     parts = []
     for name, shape, rgb in (

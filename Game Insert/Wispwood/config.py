@@ -17,7 +17,7 @@ TILE_THICKNESS = 2.133  # MEASURED single-tile thickness
 
 # --- Fit / clearances --------------------------------------------------------
 TILE_SIDE_CLEARANCE = 1.5  # per side on tile width: keeps the 38 mm comfortable fit
-STACK_LENGTH_SLACK = 8.0  # extra length so a full 80-tile stack slides freely
+STACK_LENGTH_SLACK = 9.0  # extra length so a full 80-tile stack slides freely
 TILE_DEPTH_CLEARANCE = 1.0  # extra pocket depth above the tile height
 
 # --- Pockets (derived) -------------------------------------------------------
@@ -66,10 +66,10 @@ SCOOP_CHAMFER = 1.0  # chamfer on the scoop's outer-face and top edges (finger c
 
 # --- Grip / lightening slots (long side walls) -------------------------------
 # Diagonal rounded (stadium) slots cut through each long wall to save plastic and give grip.
-GRIP_SLOT_COUNT = 4  # slots per long wall, spaced along the length
-GRIP_SLOT_WIDTH = 6.0  # stadium width (across the slot)
+GRIP_SLOT_COUNT = 8  # slots per long wall, spaced along the length
+GRIP_SLOT_WIDTH = 9.0  # stadium width (across the slot)
 GRIP_SLOT_LENGTH = 22.0  # stadium length end-to-end (along the diagonal)
-GRIP_SLOT_ANGLE = 60.0  # slot tilt above horizontal (deg)
+GRIP_SLOT_ANGLE = -60.0  # slot tilt above horizontal (deg)
 
 # --- Folding stand -----------------------------------------------------------
 # Two legs (rounded free ends) joined by a front base panel a little wider than the box
@@ -144,6 +144,15 @@ ALT_LIP_T = 3.0  # tray lip thickness (along Y)
 ALT_LIP_LEG_GAP = 0.4  # clearance under the lip over the leg hinge (so they don't fuse); 2 layers
 ALT_LIP_LEG_FLAT = 8.0  # width of the flat (bridged) span under the lip; the angled lead-ins run
 # from its edges out to the leg edges, so they cover the leg at an angle and the flat stays narrow
+# Base legs extend forward (out of the shelf) by the lip depth as feet, rounded ends; the lip
+# edge posts extend down to connect to the frame; each lip post carries a locating peg that
+# seats in a matching divot in the tray front.
+ALT_LIP_DOWN = 3.5  # how far the lip edge posts extend below the shelf face (= half frame height)
+ALT_LIP_PEG_R = 3.0  # locating-peg base radius (cone)
+ALT_LIP_PEG_TOP_R = 1.2  # locating-peg tip radius (cone narrows for an angled, printable face)
+ALT_LIP_PEG_H = 3.0  # locating-peg height
+ALT_PEG_INSET = 9.0  # peg / tray-divot inset from each tray edge
+ALT_PEG_CLEAR = 0.3  # divot oversize over the peg
 
 SHOW_ALT_STAND = True
 ALT_SHELF_THICKNESS = 7.0  # shelf plate thickness (the leg nests fully inside this, not the lips)
