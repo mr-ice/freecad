@@ -142,7 +142,8 @@ ALT_LIP_EDGE_FRAC = 0.55  # tray lip height at the shelf edges, as a fraction of
 ALT_LIP_LOW_H = 3.0  # tray lip height at the finger-groove centres (low, to clear scoops)
 ALT_LIP_T = 3.0  # tray lip thickness (along Y)
 ALT_LIP_LEG_GAP = 0.4  # clearance under the lip over the leg hinge (so they don't fuse); 2 layers
-ALT_LIP_LEG_RAMP = 3.0  # run of the angled lead-in up to that gap (gentle, prints at 0.2 mm)
+ALT_LIP_LEG_FLAT = 8.0  # width of the flat (bridged) span under the lip; the angled lead-ins run
+# from its edges out to the leg edges, so they cover the leg at an angle and the flat stays narrow
 
 SHOW_ALT_STAND = True
 ALT_SHELF_THICKNESS = 7.0  # shelf plate thickness (the leg nests fully inside this, not the lips)

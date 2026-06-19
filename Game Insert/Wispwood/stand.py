@@ -162,20 +162,20 @@ def _tray_lip():
         post = post.cut(_ycyl(r_f, lt + 2.0, fg, ly - 1.0, T + h_edge))  # fillet down to fg
         lip = lip.fuse(post)
 
-    # Clearance so the lip does not fuse to the leg hinge passing under it: raise the lip
-    # underside by ALT_LIP_LEG_GAP over the leg width, with angled lead-ins for printing.
+    # Clearance so the lip does not fuse to the leg hinge passing under it: a narrow flat span
+    # raised by ALT_LIP_LEG_GAP in the middle, with angled lead-ins running out to the leg edges
+    # (so the lead-ins clear the leg at an angle and only ALT_LIP_LEG_FLAT needs bridging).
     g = cfg.ALT_LIP_LEG_GAP
-    rmp = cfg.ALT_LIP_LEG_RAMP
-    lx0 = LEG_CX - LEG_W / 2.0 - 1.0
-    lx1 = LEG_CX + LEG_W / 2.0 + 1.0
+    fh = cfg.ALT_LIP_LEG_FLAT / 2.0
+    re_l, re_r = FG_XS  # lead-ins reach the lip bottom at the finger-groove dips (~0.2 over leg)
     cutter = _xz_prism(
         [
-            (lx0 - rmp, T - 1.0),
-            (lx1 + rmp, T - 1.0),
-            (lx1 + rmp, T),
-            (lx1, T + g),
-            (lx0, T + g),
-            (lx0 - rmp, T),
+            (re_l, T - 1.0),
+            (re_r, T - 1.0),
+            (re_r, T),
+            (LEG_CX + fh, T + g),
+            (LEG_CX - fh, T + g),
+            (re_l, T),
         ],
         ly - 1.0,
         lt + 2.0,
