@@ -67,25 +67,28 @@ def bottom_regions():
 
 
 def top_regions():
-    """Return the top-tray placement rectangles, keyed by name.
+    """Return the top-tray pocket CAVITY rectangles, keyed by name.
+
+    Each rect is the cavity to cut directly (no further inset): inset from the tray
+    perimeter by ``INSERT_WALL`` and separated from its neighbour by ``INSERT_WALL``.
+    The paw, score pad and booklet lie loose on top and are not placed here.
 
     Returns
     -------
     dict of str to Rect
-        ``board_pocket`` (loose stack of 5 pieces), ``marker_trough`` (4 markers, 214 along
-        Y), ``paw`` (1st-player token recess). The score pad and booklet lie loose on top
-        and are not placed here.
+        ``board_pocket`` (loose stack of 5 board pieces) and ``marker_trough`` (4 markers,
+        214 along Y).
     """
     c = cfg.COMPONENT_CLEARANCE
-    pocket_w = cfg.BOARD_CENTER_PTP + cfg.BOARD_POCKET_SLACK  # widest piece + slack
-    pocket_h = cfg.BOARD_PERIM_L + cfg.BOARD_POCKET_SLACK  # longest piece + slack
-    board_pocket = Rect(0.0, 0.0, pocket_w, pocket_h)
-
-    trough_w = cfg.BOX_W - board_pocket.w
-    marker_trough = Rect(board_pocket.w, 0.0, trough_w, cfg.MARKER_H + 2 * c)
-
-    paw = Rect(0.0, board_pocket.h + cfg.INSERT_WALL, cfg.PAW_W + 2 * c, cfg.PAW_H + 2 * c)
-    return {"board_pocket": board_pocket, "marker_trough": marker_trough, "paw": paw}
+    w = cfg.INSERT_WALL
+    board_w = cfg.BOARD_CENTER_PTP + cfg.BOARD_POCKET_SLACK  # widest piece + slack
+    board_h = cfg.BOARD_PERIM_L + cfg.BOARD_POCKET_SLACK  # longest piece + slack
+    board_pocket = Rect(w, w, board_w, board_h)
+    trough_x = board_pocket.x + board_pocket.w + w  # wall gap after the board pocket
+    trough_w = cfg.BOX_W - w - trough_x  # remaining width inside the right wall
+    trough_h = cfg.MARKER_H + 2 * c  # 214 markers along Y + clearance
+    marker_trough = Rect(trough_x, w, trough_w, trough_h)
+    return {"board_pocket": board_pocket, "marker_trough": marker_trough}
 
 
 def rect_in_box(r):

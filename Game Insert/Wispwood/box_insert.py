@@ -79,11 +79,12 @@ def build_small_tray():
 
 
 def build_top_tray():
-    """Build the printed top tray: board pocket, marker trough, paw recess.
+    """Build the printed top tray: board pocket and marker trough.
 
-    A ``TOP_TRAY_DEPTH``-tall plate over the box footprint with three pockets. The board
-    pocket holds the 5 loose pieces; the marker trough holds 4 markers along Y; the paw
-    recess holds the 1st-player token. Score pad and booklet lie loose on top (no pocket).
+    A ``TOP_TRAY_DEPTH``-tall plate over the box footprint with two pockets cut directly
+    from the cavity rects returned by :func:`box_layout.top_regions` (no further inset).
+    The board pocket holds the 5 loose board pieces; the marker trough holds 4 markers along
+    Y. The 1st-player paw, score pad, and booklet lie loose on top (no pocket).
 
     Returns
     -------
@@ -96,27 +97,15 @@ def build_top_tray():
     floor = cfg.INSERT_FLOOR
     block = _box(0.0, 0.0, 0.0, cfg.BOX_W, cfg.BOX_L, depth)
 
-    for key in ("board_pocket", "marker_trough", "paw"):
+    for key in ("board_pocket", "marker_trough"):
         r = t[key]
-        block = block.cut(
-            _box(
-                r.x + cfg.INSERT_WALL,
-                r.y + cfg.INSERT_WALL,
-                floor,
-                r.w - 2 * cfg.INSERT_WALL,
-                r.h - 2 * cfg.INSERT_WALL,
-                depth,
-            )
-        )
+        block = block.cut(_box(r.x, r.y, floor, r.w, r.h, depth))
 
-    # Finger scoop into the board pocket (half-cylinder through the near long wall).
+    # Finger scoop across the board-pocket mouth (half-cylinder trough at the top rim).
     p = t["board_pocket"]
     block = block.cut(
         Part.makeCylinder(
-            cfg.FINGER_SCOOP_R,
-            p.w,
-            Vector(p.x + p.w / 2.0, p.y + cfg.INSERT_WALL, depth),
-            Vector(0, -1, 0),
+            cfg.FINGER_SCOOP_R, p.w, Vector(p.x, p.y + p.h / 2.0, depth), Vector(1, 0, 0)
         )
     )
     _assert_within_bed(block, "TopTray")

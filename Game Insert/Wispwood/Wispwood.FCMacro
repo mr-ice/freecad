@@ -39,6 +39,9 @@ importlib.reload(wispwood)
 import alt_stand  # noqa: E402
 
 importlib.reload(alt_stand)
+import box_layout  # noqa: E402
+
+importlib.reload(box_layout)
 import box_insert  # noqa: E402
 
 importlib.reload(box_insert)

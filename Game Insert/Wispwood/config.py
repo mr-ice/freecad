@@ -235,7 +235,9 @@ INSERT_WALL = 2.0  # well/divider wall thickness
 INSERT_FLOOR = 1.5  # tray floor thickness
 TOP_TRAY_DEPTH = 12.0  # top-tray height (board stack is the tallest content)
 FINGER_SCOOP_R = 12.0  # radius of the finger-access scoop notches in the trays
-SMALL_TRAY_RIM_Z = 42.0  # bottom-tray rim, matched to the Wispwood tray top
+SMALL_TRAY_RIM_Z = (
+    FLOOR_THICKNESS + POCKET_DEPTH + LID_THICKNESS + LID_SLIDE_CLEARANCE + LID_TOP_LIP
+)  # = Wispwood WALL_TOP (~42.7); top tray rests flush on the Wispwood + small trays
 COMPONENT_CLEARANCE = GENERAL_CLEARANCE  # per-side fit clearance for component wells
 
 # Folded alt stand must clear under the top tray (which rests at z = 42).

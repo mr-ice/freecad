@@ -68,3 +68,20 @@ def test_wells_inside_small_tray():
     tray = b["small_tray"]
     for key in ("well_card", "well_cats", "well_round"):
         assert _within(b[key], tray), f"{key} {b[key]} not inside small_tray {tray}"
+
+
+def test_top_pocket_cavities_clear_components():
+    """Each top-tray pocket cavity (cut directly) clears its component footprint."""
+    t = bl.top_regions()
+    bp = t["board_pocket"]
+    assert min(bp.w, bp.h) >= cfg.BOARD_CENTER_PTP
+    assert max(bp.w, bp.h) >= cfg.BOARD_PERIM_L
+    mt = t["marker_trough"]
+    assert max(mt.w, mt.h) >= cfg.MARKER_H
+    assert min(mt.w, mt.h) >= cfg.MARKER_W
+
+
+def test_top_regions_do_not_overlap():
+    """The board pocket and marker trough do not overlap."""
+    t = bl.top_regions()
+    assert bl.rects_disjoint(t["board_pocket"], t["marker_trough"])

@@ -106,13 +106,12 @@ components. A two-layer packing keeps the chunky pieces below and the flat cardb
   - **Card well** — unsleeved card deck (63 × 88 mm) in a recess with a finger-scoop notch.
   - **Round-token well** — 8 round tokens (Ø34 mm) in a cylindrical well.
 
-**Top layer (z = 42 → ~54 mm):**
-- A **printed top tray** (full box footprint, `TOP_TRAY_DEPTH` = 12 mm) with three pockets:
+**Top layer (z = ~42.7 → ~54.7 mm):**
+- A **printed top tray** (full box footprint, `TOP_TRAY_DEPTH` = 12 mm) with two pockets:
   - **Board pocket** — holds the 5 loose board pieces (widest piece `BOARD_CENTER_PTP` = 135 mm,
-    longest `BOARD_PERIM_L` = 190 mm); a finger scoop aids extraction.
+    longest `BOARD_PERIM_L` = 190 mm); a finger scoop across the pocket mouth aids extraction.
   - **Marker trough** — 4 flat marker standees (214 mm tall, stored along Y).
-  - **Paw recess** — 1st-player paw token (70 × 64 mm).
-- **Score pad + rules booklet** lie loose on top of the top tray; no pocket needed.
+- **1st-player paw, score pad + rules booklet** lie loose on top of the top tray; no pocket needed.
 
 **Bed size:** the trays are checked against `MAX_PRINTER_DIMENSION = 350` mm (XL bed required)
 at build time via `_assert_within_bed`.
