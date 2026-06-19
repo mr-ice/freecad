@@ -86,9 +86,9 @@ B_BASE = S_HINGES * math.cos(_THETA) + math.sqrt(
 X_LOCK = B_BASE  # kept name for downstream offsets
 BASE_CROSS_Y = HBY + B_BASE  # cradle line (from the bottom hinge)
 LIP_EDGE_H = cfg.ALT_LIP_EDGE_FRAC * d.WALL_TOP  # deep-lip height at the edges (~55% tray height)
-# Base legs extend forward (toward the foot) by the lip depth, out past the shelf, as feet.
-BASE_LEN = B_BASE + cfg.ALT_BASE_FOOT + LIP_EDGE_H
-NATIVE_Y_MIN = 0.0
+BASE_LEN = B_BASE + cfg.ALT_BASE_FOOT  # +Y extent (hinge to cradle + a little)
+FOOT_EXT = LIP_EDGE_H  # base legs extend this far forward (-Y) out the front of the shelf, as feet
+NATIVE_Y_MIN = -FOOT_EXT  # the forward feet are the most-forward point
 DISPLAY_X_OFFSET = W + 30.0
 
 # Locating-peg X positions: inset from each tray edge (the tray is centred on the wider shelf),
@@ -271,16 +271,15 @@ def _lock_cradle(nc):
 def _base_leg(nc):
     """Return one H leg (raw, unflattened): a bar continued onto its bored hinge cylinder.
 
-    The leg runs from the bottom hinge forward past the shelf (the foot extends out by the lip
-    depth via ``BASE_LEN``) and its free foot end is rounded like the other edges.
+    The leg runs from the cradle end back through the hinge and **forward (-Y) out past the
+    front of the shelf** by ``FOOT_EXT`` as a foot; the forward tip is rounded about X, like the
+    rod ends.
     """
     x0 = nc - BASE_LEG_W / 2.0
-    r = BASE_LEG_W / 2.0
-    foot_end = HBY + BASE_LEN
-    bar = _box(x0, HBY, 0.0, BASE_LEG_W, BASE_LEN - r, T)  # straight part
-    bar = bar.fuse(
-        Part.makeCylinder(r, T, Vector(nc, foot_end - r, 0.0), Vector(0, 0, 1))
-    )  # round foot
+    foot_y = HBY - FOOT_EXT  # forward (-Y) foot tip, out past the front of the shelf
+    top_y = HBY + BASE_LEN  # +Y end (past the cradle)
+    bar = _box(x0, foot_y, 0.0, BASE_LEG_W, top_y - foot_y, T)
+    bar = bar.fuse(_xcyl(T / 2.0, BASE_LEG_W, x0, foot_y, ZC))  # foot rounded about X, like rods
     leg = bar.fuse(_xcyl(ROD_R, BASE_LEG_W, x0, HBY, ZC))  # rounded hinge end
     leg = leg.cut(_xcyl(BORE, BASE_LEG_W + 2.0, x0 - 1.0, HBY, ZC))  # pin hole through both
     # 47/47: keep only the lower part where the leg passes under the shelf crossmember.
