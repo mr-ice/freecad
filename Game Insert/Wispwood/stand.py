@@ -42,7 +42,6 @@ SHELF_H = cfg.ALT_SHELF_HEIGHT
 CR = cfg.ALT_FRAME_CORNER_R  # frame corner fillet radius
 CROSS_Y = cfg.ALT_CROSS_Y  # shelf crossmember (tray rest + leg hinge)
 PIN_R = cfg.ALT_BARREL_NECK_R
-NECK_XS = tuple(f * W for f in cfg.ALT_BARREL_NECK_FRACS)  # two base-hinge band centres
 BORE = PIN_R + cfg.ALT_HINGE_PIN_CLEAR
 ACLR = cfg.ALT_HINGE_AXIAL_CLEAR
 BASE_LEG_W = cfg.ALT_BASE_LEG_WIDTH
@@ -50,6 +49,11 @@ LEG_W = cfg.ALT_LEG_WIDTH
 L_LEG = cfg.ALT_LEG_LENGTH
 CROSS_W = cfg.ALT_BASE_CROSS_W
 LEG_CX = W / 2.0
+
+# Base-leg hinge centres: placed a clear ALT_LEG_BASE_GAP outboard of the prop leg, so the
+# leg-hinge neck on the crossmember does not start inside the base's pass-under cutout.
+_BL_OFFSET = LEG_W / 2.0 + cfg.ALT_LEG_BASE_GAP + BASE_LEG_W / 2.0
+NECK_XS = (LEG_CX - _BL_OFFSET, LEG_CX + _BL_OFFSET)
 
 # Base outer span (the leg end-cylinder matches this so it reaches both leg cradles).
 BASE_X0 = NECK_XS[0] - BASE_LEG_W / 2.0
@@ -102,6 +106,13 @@ def _ycyl(r, length, x, y, z):
 def _flat(shape):
     """Trim a rod assembly to the printable ``Z[0, T]`` cross-section (flat top and bottom)."""
     return shape.common(_box(-1000.0, -1000.0, 0.0, 2000.0, 2000.0, T))
+
+
+def _yz_prism(pts_yz, x0, dx):
+    """Extrude a closed Y-Z polygon (list of ``(y, z)``) ``dx`` along ``+X`` from ``x0``."""
+    verts = [Vector(x0, y, z) for y, z in pts_yz]
+    verts.append(verts[0])
+    return Part.Face(Part.makePolygon(verts)).extrude(Vector(dx, 0.0, 0.0))
 
 
 def _corner(cx, cy, start_deg):
@@ -186,11 +197,20 @@ def build_shelf():
 
 
 def _lock_cradle(nc):
-    """Return a lock cradle on one base leg: a raised boss with a concave seat for the leg rod."""
+    """Return a lock cradle on one base leg: raised seat + a ramp gusset to the base end.
+
+    A boss with a concave seat (open toward the hinge) that the leg end-cylinder clicks into,
+    reinforced on the foot side by a solid wedge that ramps from the cradle top smoothly down
+    to the base surface before the base end — strong, with a clean transition.
+    """
     x0 = nc - BASE_LEG_W / 2.0
+    base_end = HBY + BASE_LEN
     boss = _box(x0, BASE_CROSS_Y - ROD_R - 1.0, T, BASE_LEG_W, 2 * ROD_R + 2.0, ROD_R)
     seat = _xcyl(ROD_R + cfg.ALT_SNAP_CLEAR, BASE_LEG_W + 2.0, x0 - 1.0, BASE_CROSS_Y, T + ROD_R)
-    return boss.cut(seat)
+    cradle = boss.cut(seat)
+    ramp_y0 = BASE_CROSS_Y + ROD_R + 1.0  # foot edge of the boss
+    ramp = _yz_prism([(ramp_y0, T), (base_end, T), (ramp_y0, T + ROD_R)], x0, BASE_LEG_W)
+    return cradle.fuse(ramp)
 
 
 def _base_leg(nc):

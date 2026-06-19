@@ -185,9 +185,11 @@ ALT_HINGE_AXIAL_CLEAR = 0.3  # axial gap between leg and plate knuckles
 # Where two parts overlap in plan (base leg ↔ shelf cross, base crossbar ↔ prop leg) they
 # share the thickness ~47/47: one keeps the back ~47%, the other the front ~47%, with this gap
 # between so they print free. Each part = (thickness - gap) / 2.
-ALT_SPLIT_GAP = 1.0  # ≥1 mm so the lower (build-plate) part stays solid and the gap bridges
+ALT_SPLIT_GAP = 0.4
 ALT_CRADLE_OFFSET = 3.5  # height of the lock-cradle seat above the base centreline (the leg
 # end-cylinder locks here, on TOP of the base, so the deployed lock geometry is offset up by this
+ALT_LEG_BASE_GAP = 4.0  # in-plane gap between the prop leg and each base leg, so the leg-hinge
+# neck on the crossmember clears the base's pass-under cutout (was ~1.3 mm, too tight)
 
 # Base (the foot): a second print-in-place hinge centred in the shelf's bottom border (same
 # Ø7 knuckles / Ø3 pin, knuckles subdivided to match the prop-leg hinge). Two legs run up
