@@ -128,6 +128,14 @@ ALT_BARREL_NECK_FRACS = (0.28, 0.72)  # neck-band centres as a fraction of the s
 ALT_LEG_HINGE_Y = 18.0  # prop-leg hinge distance up the shelf from the barrel axis
 ALT_SNAP_R = 2.0  # radius of the leg-tip snap bump and the base socket
 ALT_SNAP_CLEAR = 0.15  # snap interference (smaller = stronger click)
+# Rod-frame stand (per stand.md): shelf is a rounded rectangle of rod; base is an H hinged on
+# the shelf's bottom rod (necked to a pin); the leg hinges on the shelf crossmember and its
+# end-cylinder clicks into the base.
+ALT_ROD_R = 3.5  # frame rod radius (Ø7 rod)
+ALT_CROSS_Y = 24.0  # shelf crossmember Y (tray sits here; the leg hinges on it)
+ALT_TRAY_LIP_H = 3.0  # lip height above the shelf face that catches the tray bottom edge
+ALT_BASE_FOOT = 12.0  # base length past the lock line (foot)
+ALT_BASE_CROSS_W = 9.0  # base/leg crossmember width along the part
 
 SHOW_ALT_STAND = True
 ALT_SHELF_THICKNESS = 7.0  # shelf plate thickness (the leg nests fully inside this, not the lips)
@@ -152,7 +160,7 @@ ALT_SHELF_CORNER_H_FRAC = 0.5  # corner-post height as a fraction of the tray he
 # Leg (the prop): nests FULLY INSIDE the shelf plate, in a pocket cut in the back, free of all
 # other structure except a print-in-place hinge just above the cross-lip. It swings out to
 # prop the stand; its free end is a flattened cylinder forming a T, for locking upright later.
-ALT_LEG_LENGTH = 60.0  # hinge axis to the T crossbar (fits folded within the shelf height)
+ALT_LEG_LENGTH = 50.0  # leg hinge to its end-cylinder; fits folded between crossmember and top
 ALT_LEG_WIDTH = 24.0  # leg-bar width (across) = hinge span
 ALT_LEG_THICK = 7.0  # leg-bar thickness (<= plate thickness so it sits recessed inside)
 ALT_LEG_HINGE_GAP = 2.0  # gap above the cross-lip to the hinge axis

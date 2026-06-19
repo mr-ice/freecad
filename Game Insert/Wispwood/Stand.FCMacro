@@ -1,0 +1,52 @@
+"""FreeCAD macro: render only the Wispwood stand parts, for fast iteration.
+
+Run inside FreeCAD 1.0.2. Reloads ``config``, ``derived`` and ``stand`` so edits take effect
+without restarting, recreates a stand-only document, and sets an isometric, fit-all view.
+"""
+
+import importlib
+import os
+import sys
+
+import FreeCAD as App
+import FreeCADGui as Gui
+
+DOC_NAME = "WispwoodStand"
+
+try:
+    _macro_dir = os.path.dirname(os.path.abspath(__file__))
+except NameError:  # __file__ is undefined in some macro contexts
+    _macro_dir = (
+        os.path.dirname(os.path.abspath(App.ActiveDocument.FileName))
+        if App.ActiveDocument
+        else os.getcwd()
+    )
+if _macro_dir not in sys.path:
+    sys.path.insert(0, _macro_dir)
+
+import config  # noqa: E402
+
+importlib.reload(config)
+import derived  # noqa: E402
+
+importlib.reload(derived)
+import stand  # noqa: E402
+
+importlib.reload(stand)
+
+if DOC_NAME in App.listDocuments():
+    App.closeDocument(DOC_NAME)
+doc = App.newDocument(DOC_NAME)
+
+for name, shape, rgb, visible, transparency in stand.build_all():
+    obj = doc.addObject("Part::Feature", name)
+    obj.Shape = shape
+    if obj.ViewObject is not None:
+        obj.ViewObject.ShapeColor = rgb
+        obj.ViewObject.Visibility = visible
+        obj.ViewObject.Transparency = transparency
+
+doc.recompute()
+
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")

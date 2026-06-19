@@ -1,22 +1,24 @@
-"""The Wispwood display stand (redesigned barrel-hinge stand).
+"""The Wispwood display stand — rod-frame design (see ``stand.md``).
 
-A three-part, print-in-place triangular stand that holds the tray tilted for play:
+Three print-in-place parts that hold the tray upright at ``STAND_DEPLOY_ANGLE``:
 
-- **Shelf** — a flat plate that the tray rests against (cross-lip + side lips grab it). Its
-  bottom edge is a full-width **barrel** (Ø = plate thickness) with two narrowed **neck**
-  bands that form the base hinge.
-- **Base** — the foot. Two legs hinge on the barrel necks via knuckles; their shelf-facing
-  edge is a **concave cylinder** matching the barrel so contact stays continuous as it
-  rotates. An **unbroken crossbar** joins the legs and carries the lock socket.
-- **Leg** — a prop hinged up the shelf; its tip **snaps** into the base crossbar socket. The
-  socket position is **computed** so the shelf locks at ``STAND_DEPLOY_ANGLE`` above the table.
+- **Shelf** — an empty rounded rectangle of Ø(2·rod) rod, filleted corners. A crossmember
+  rod carries a lip the tray sits against; the bottom rod necks down to **pins** for the base
+  hinge, and the crossmember rod necks down for the leg hinge.
+- **Base** — an **H** (two legs + a crossmember) hinged on the shelf bottom-rod pins (each
+  leg is a bored knuckle on a necked pin). It folds inside the shelf rectangle, **under** the
+  shelf crossmember (shared 47/47 thickness: base lower, crossmember upper).
+- **Leg** — hinged on the shelf crossmember; its far end is a rod-profile cross-cylinder that
+  clicks into the base when deployed. Where it crosses the base crossmember they share 47/47
+  (base lower, leg upper).
 
-Modelled flat (the print orientation): the barrel axis is along ``X`` at ``Y = 0``; the shelf
-extends ``+Y`` and the base extends ``-Y``; ``Z`` is the print height (sheets in ``Z[0, T]``,
-lips above). Deployment folds the shelf up about the barrel.
+Modelled flat (print/folded orientation): parts lie in ``Z[0, 2·rod]`` with hinge axes along
+``X``; the shelf extends ``+Y`` and hinges at ``Y = rod`` (bottom) and ``Y = ALT_CROSS_Y``
+(crossmember). The base lock line is **computed** from the hinge positions and leg length so
+the deployed shelf sits at ``STAND_DEPLOY_ANGLE``.
 
-All offsets derive from named constants (repo ``CLAUDE.md``); the lock is derived from the
-hinge positions and leg length, never measured.
+In-progress rebuild toward ``stand.md`` (base-focused); clearances and the snap lock still
+need print tuning.
 
 Public API
 ----------
@@ -32,32 +34,34 @@ import Part
 from FreeCAD import Vector
 
 # --- Frame / derived geometry ------------------------------------------------
-W = d.ALT_SHELF_W  # stand width (hinge axis), matches the tray + side lips
-T = cfg.ALT_SHELF_THICKNESS  # plate / sheet thickness
-R = T / 2.0  # barrel radius (full diameter = plate thickness)
-SHELF_H = cfg.ALT_SHELF_HEIGHT  # shelf length above the barrel
-NECK_R = cfg.ALT_BARREL_NECK_R
-NECK_W = cfg.ALT_BARREL_NECK_W
-NECK_XS = tuple(f * W for f in cfg.ALT_BARREL_NECK_FRACS)  # two base-knuckle band centres
-D_LEG = cfg.ALT_LEG_HINGE_Y  # prop-leg hinge distance up the shelf
-L_LEG = cfg.ALT_LEG_LENGTH
-LEG_W = cfg.ALT_LEG_WIDTH
-PIN_R = cfg.ALT_HINGE_PIN_R
-CLR = cfg.ALT_HINGE_PIN_CLEAR
+W = d.ALT_SHELF_W  # stand width (hinge-axis direction)
+RR = cfg.ALT_ROD_R  # frame rod radius
+T = 2.0 * RR  # part thickness (= rod diameter)
+ZC = RR  # rod/centre Z (parts span Z[0, T])
+SHELF_H = cfg.ALT_SHELF_HEIGHT
+CROSS_Y = cfg.ALT_CROSS_Y  # shelf crossmember (tray rest + leg hinge)
+PIN_R = cfg.ALT_BARREL_NECK_R  # necked-pin radius
+NECK_XS = tuple(f * W for f in cfg.ALT_BARREL_NECK_FRACS)  # two base-hinge band centres
+BORE = PIN_R + cfg.ALT_HINGE_PIN_CLEAR  # knuckle bore around a pin
 ACLR = cfg.ALT_HINGE_AXIAL_CLEAR
+BASE_LEG_W = cfg.ALT_BASE_LEG_WIDTH
+LEG_W = cfg.ALT_LEG_WIDTH
+L_LEG = cfg.ALT_LEG_LENGTH
+CROSS_W = cfg.ALT_BASE_CROSS_W
+LEG_CX = W / 2.0  # leg centred on the width
 
+# Shared-thickness (47/47) split planes for overlapping folded parts.
+SPLIT_LOW = (T - cfg.ALT_SPLIT_GAP) / 2.0  # a "lower" part keeps Z[0, SPLIT_LOW]
+SPLIT_HIGH = SPLIT_LOW + cfg.ALT_SPLIT_GAP  # an "upper" part keeps Z[SPLIT_HIGH, T]
+
+# Lock line: distance up the base (from the bottom hinge) where the leg end meets the base
+# when the shelf is folded up to the deploy angle, derived from the leg-hinge height and length.
 _THETA = math.radians(cfg.STAND_DEPLOY_ANGLE)
-# Lock distance along the base from the barrel: where the prop-leg tip meets the table (Z=0)
-# when the shelf is folded up to STAND_DEPLOY_ANGLE. Derived from the two hinge positions and
-# the leg length (the leg hinge sits D_LEG up the shelf; its tip swings down to the base).
-X_LOCK = math.sqrt(L_LEG**2 - (D_LEG * math.sin(_THETA)) ** 2) - D_LEG * math.cos(_THETA)
-BASE_LEN = X_LOCK + 15.0  # base reaches a little past the lock line for a stable foot
-NATIVE_Y_MIN = -BASE_LEN  # min Y of the flat model (used to place it in the box)
-DISPLAY_X_OFFSET = W + 30.0  # offset for standalone review in the macro
-
-# Prop leg centred between the two base legs.
-LEG_X0 = W / 2.0 - LEG_W / 2.0
-LEG_X1 = W / 2.0 + LEG_W / 2.0
+X_LOCK = math.sqrt(L_LEG**2 - (CROSS_Y * math.sin(_THETA)) ** 2) - CROSS_Y * math.cos(_THETA)
+BASE_CROSS_Y = ZC + X_LOCK  # base crossmember on the lock line (from the bottom hinge)
+BASE_LEN = X_LOCK + cfg.ALT_BASE_FOOT
+NATIVE_Y_MIN = 0.0
+DISPLAY_X_OFFSET = W + 30.0
 
 
 def _box(x, y, z, dx, dy, dz):
@@ -70,116 +74,150 @@ def _xcyl(r, length, x, y, z):
     return Part.makeCylinder(r, length, Vector(x, y, z), Vector(1.0, 0.0, 0.0))
 
 
-def _leg_segments():
-    """Return ``(x0, x1, is_plate)`` for the prop-leg hinge (plate / leg / plate)."""
-    seg = LEG_W / 3.0
-    return [(LEG_X0 + i * seg, LEG_X0 + (i + 1) * seg, i % 2 == 0) for i in range(3)]
+def _ycyl(r, length, x, y, z):
+    """Return a cylinder of radius ``r`` along ``+Y`` from ``(x, y, z)``."""
+    return Part.makeCylinder(r, length, Vector(x, y, z), Vector(0.0, 1.0, 0.0))
+
+
+def _necked_rod(y, x0, x1, necks):
+    """Return an X rod (Ø = 2·RR) along ``Y = y`` from ``x0`` to ``x1``, necked to pins.
+
+    ``necks`` is an iterable of ``(centre, width)``; over each band the rod radius drops to
+    ``PIN_R`` so a moving knuckle can ride it as a hinge pin, with full-radius collars between
+    bands to locate the knuckles axially.
+    """
+    rod = _xcyl(RR, x1 - x0, x0, y, ZC)
+    for nc, nw in necks:
+        nx = nc - nw / 2.0
+        rod = rod.cut(_xcyl(RR + 0.5, nw, nx, y, ZC))
+        rod = rod.fuse(_xcyl(PIN_R, nw, nx, y, ZC))
+    return rod
 
 
 def build_shelf():
-    """Build the shelf: plate + barrel (with two necks) + tray lips + prop-leg hinge.
+    """Build the shelf: rounded-rectangle rod frame + necked hinge rods + tray crossmember.
 
     Returns
     -------
     Part.Shape
-        The shelf solid (flat print orientation).
+        The shelf solid (flat orientation).
     """
-    plate = _box(0.0, 0.0, 0.0, W, SHELF_H, T)
+    base_necks = [(nc, BASE_LEG_W + 2 * ACLR) for nc in NECK_XS]
+    bottom = _necked_rod(ZC, 0.0, W, base_necks)
+    top = _xcyl(RR, W, 0.0, SHELF_H - RR, ZC)
+    left = _ycyl(RR, SHELF_H, RR, 0.0, ZC)
+    right = _ycyl(RR, SHELF_H, W - RR, 0.0, ZC)
+    shelf = bottom.fuse(top).fuse(left).fuse(right)
+    for cx, cy in ((RR, RR), (W - RR, RR), (RR, SHELF_H - RR), (W - RR, SHELF_H - RR)):
+        shelf = shelf.fuse(Part.makeSphere(RR, Vector(cx, cy, ZC)))  # filleted corners
 
-    # Barrel along the bottom edge, full radius except the two neck bands.
-    barrel = _xcyl(R, W, 0.0, 0.0, R)
+    # Crossmember rod, necked at the centre for the leg hinge.
+    shelf = shelf.fuse(_necked_rod(CROSS_Y, RR, W - RR, [(LEG_CX, LEG_W + 2 * ACLR)]))
+
+    # 47/47: the base folds under the crossmember, so remove the crossmember's lower half in
+    # the two base-leg bands (the base keeps the lower there).
     for nc in NECK_XS:
-        x0 = nc - NECK_W / 2.0
-        barrel = barrel.cut(_xcyl(R + 0.5, NECK_W, x0, 0.0, R))  # clear the band to the neck
-        barrel = barrel.fuse(_xcyl(NECK_R, NECK_W, x0, 0.0, R))  # leave the thin neck rod
-    shelf = plate.fuse(barrel)
+        shelf = shelf.cut(
+            _box(
+                nc - BASE_LEG_W / 2.0 - 1.0,
+                CROSS_Y - RR - 1.0,
+                -1.0,
+                BASE_LEG_W + 2.0,
+                2 * RR + 2.0,
+                SPLIT_HIGH + 1.0,
+            )
+        )
 
-    # Tray lips on the shelf top: a simple uniform cross-lip near the barrel, two side lips.
-    cl_y0 = R + 1.0
-    clt, clh = cfg.ALT_SHELF_CROSS_LIP_T, cfg.ALT_SHELF_CROSS_LIP_H
-    slw, slh = cfg.ALT_SHELF_SIDE_LIP_W, cfg.ALT_SHELF_SIDE_LIP_H
-    shelf = shelf.fuse(_box(0.0, cl_y0, T, W, clt, clh))  # cross-lip
-    shelf = shelf.fuse(_box(0.0, cl_y0, T, slw, SHELF_H - cl_y0, slh))  # left side lip
-    shelf = shelf.fuse(_box(W - slw, cl_y0, T, slw, SHELF_H - cl_y0, slh))  # right side lip
-
-    # Prop-leg hinge: pin across the leg width + plate knuckles (outer segments).
-    shelf = shelf.fuse(_xcyl(PIN_R, LEG_W, LEG_X0, D_LEG, R))
-    for x0, x1, is_plate in _leg_segments():
-        if is_plate:
-            shelf = shelf.fuse(_xcyl(R, x1 - x0, x0, D_LEG, R))
-            shelf = shelf.fuse(_box(x0, D_LEG, 0.0, x1 - x0, R + 1.0, T))  # neck back to plate
+    # Tray lip: a narrow wall above the shelf face, in front of the crossmember (clears the
+    # tray finger scoops), that the tray bottom edge rests against.
+    shelf = shelf.fuse(_box(RR, CROSS_Y - 1.0, T, W - 2 * RR, 2.0, cfg.ALT_TRAY_LIP_H))
     return shelf
 
 
 def _base_leg(nc):
-    """Return one base leg (knuckle on the barrel neck + bar running ``-Y``)."""
-    half = (NECK_W + 4.0) / 2.0
-    x0, x1 = nc - half, nc + half
-    # Knuckle ring around the neck (bored with clearance), axially inset from the collars.
-    knuckle = _xcyl(R, NECK_W - 2.0 * ACLR, nc - NECK_W / 2.0 + ACLR, 0.0, R)
-    knuckle = knuckle.cut(_xcyl(NECK_R + CLR, NECK_W, nc - NECK_W / 2.0 - 0.5, 0.0, R))
-    # Bar from the hinge running -Y to the base end.
-    bar = _box(x0, -BASE_LEN, 0.0, x1 - x0, BASE_LEN, T)
-    return bar.fuse(knuckle)
+    """Return one H leg: a knuckle on the bottom-rod pin + a bar up to the foot."""
+    x0 = nc - BASE_LEG_W / 2.0
+    # Bar starts clear of the bottom rod (above Y = rod top) so only the knuckle touches it.
+    bar = _box(x0, ZC + RR, 0.0, BASE_LEG_W, BASE_LEN - RR, T)
+    knuckle = _xcyl(RR, BASE_LEG_W, x0, ZC, ZC)
+    leg = bar.fuse(knuckle)
+    leg = leg.cut(_xcyl(BORE, BASE_LEG_W + 2.0, x0 - 1.0, ZC, ZC))  # bore for the pin
+    # 47/47: keep only the lower part where the leg passes under the shelf crossmember.
+    leg = leg.cut(_box(x0 - 1.0, CROSS_Y - RR - 1.0, SPLIT_LOW, BASE_LEG_W + 2.0, 2 * RR + 2.0, T))
+    return leg
 
 
 def build_base():
-    """Build the base: two legs on the barrel necks + concave mating edge + crossbar + socket.
-
-    The crossbar is unbroken and sits on the computed lock line (``Y = -X_LOCK``); its centre
-    carries the snap socket that the prop-leg tip clicks into.
+    """Build the base: an H (two hinged legs + crossmember) with a lock catch.
 
     Returns
     -------
     Part.Shape
-        The base solid (flat print orientation).
+        The base solid (flat orientation).
     """
-    base = None
-    for nc in NECK_XS:
-        leg = _base_leg(nc)
-        base = leg if base is None else base.fuse(leg)
+    base = _base_leg(NECK_XS[0]).fuse(_base_leg(NECK_XS[1]))
 
-    # Concave mating edge: clear the full-radius barrel so the base rides it as it rotates.
-    base = base.cut(_xcyl(R + CLR, W, 0.0, 0.0, R))
+    # Crossmember joining the two legs on the lock line.
+    cross = _box(NECK_XS[0], BASE_CROSS_Y - CROSS_W / 2.0, 0.0, NECK_XS[1] - NECK_XS[0], CROSS_W, T)
+    base = base.fuse(cross)
 
-    # Unbroken crossbar on the lock line, joining the two legs.
-    cross_w = 10.0
-    cy = -X_LOCK
-    base = base.fuse(_box(NECK_XS[0], cy - cross_w / 2.0, 0.0, NECK_XS[1] - NECK_XS[0], cross_w, T))
+    # 47/47: the leg rests over the base crossmember, so remove the crossmember's upper half in
+    # the leg band (the base keeps the lower there).
+    base = base.cut(
+        _box(
+            LEG_CX - LEG_W / 2.0 - 1.0,
+            BASE_CROSS_Y - CROSS_W / 2.0 - 1.0,
+            SPLIT_HIGH,
+            LEG_W + 2.0,
+            CROSS_W + 2.0,
+            T,
+        )
+    )
 
-    # Snap socket in the crossbar centre (the prop-leg tip seats here when deployed).
-    sr = cfg.ALT_SNAP_R - cfg.ALT_SNAP_CLEAR
-    base = base.cut(Part.makeSphere(sr, Vector(W / 2.0, cy, T)))
+    # Lock catch: a raised boss with a concave cradle (radius RR + clearance) on the lower
+    # band that the leg end-cylinder clicks into when deployed.
+    boss = _box(
+        LEG_CX - RR - 2.0, BASE_CROSS_Y - RR - 1.0, SPLIT_LOW, 2 * RR + 4.0, 2 * RR + 2.0, RR
+    )
+    boss = boss.cut(
+        _xcyl(
+            RR + cfg.ALT_SNAP_CLEAR, 2 * RR + 6.0, LEG_CX - RR - 3.0, BASE_CROSS_Y, SPLIT_LOW + RR
+        )
+    )
+    base = base.fuse(boss)
     return base
 
 
 def build_leg():
-    """Build the prop leg: bar + hinge knuckle + tip snap bump.
-
-    The bar runs from the shelf hinge (``Y = D_LEG``) up the shelf and stops short of the top
-    (no fuse). Its tip carries a snap bump that engages the base crossbar socket when deployed.
+    """Build the prop leg: a bar hinged on the shelf crossmember, with an end-cylinder.
 
     Returns
     -------
     Part.Shape
-        The leg solid (flat print orientation).
+        The leg solid (flat orientation).
     """
-    tip_y = D_LEG + L_LEG
-    leg = _box(LEG_X0, D_LEG, 0.0, LEG_W, L_LEG, T)
+    x0 = LEG_CX - LEG_W / 2.0
+    tip_y = CROSS_Y + L_LEG
+    # Bar starts clear of the crossmember rod; the knuckle bridges down to the pin.
+    bar = _box(x0, CROSS_Y + RR, 0.0, LEG_W, L_LEG - RR, T)
+    knuckle = _xcyl(RR, LEG_W, x0, CROSS_Y, ZC)
+    leg = bar.fuse(knuckle)
+    leg = leg.cut(_xcyl(BORE, LEG_W + 2.0, x0 - 1.0, CROSS_Y, ZC))
 
-    # Hinge: leg knuckle (middle segment) bored for the pin; notch clear of the plate knuckles.
-    for x0, x1, is_plate in _leg_segments():
-        if is_plate:
-            leg = leg.cut(
-                _box(x0 - ACLR, D_LEG - 1.0, -1.0, (x1 - x0) + 2 * ACLR, R + 1.0, T + 2.0)
-            )
-        else:
-            leg = leg.fuse(_xcyl(R, (x1 - x0) - 2 * ACLR, x0 + ACLR, D_LEG, R))
-    leg = leg.cut(_xcyl(PIN_R + CLR, LEG_W + 2.0, LEG_X0 - 1.0, D_LEG, R))
+    # End cross-cylinder (rod profile) that clicks into the base catch.
+    leg = leg.fuse(_xcyl(RR, LEG_W, x0, tip_y, ZC))
 
-    # Tip snap bump (engages the base socket when deployed).
-    sr = cfg.ALT_SNAP_R
-    leg = leg.fuse(Part.makeSphere(sr, Vector(W / 2.0, tip_y, T)))
+    # 47/47: keep only the upper part where the leg rests over the base crossmember.
+    leg = leg.cut(
+        _box(
+            x0 - 1.0,
+            BASE_CROSS_Y - CROSS_W / 2.0 - 1.0,
+            -1.0,
+            LEG_W + 2.0,
+            CROSS_W + 2.0,
+            SPLIT_LOW + 1.0,
+        )
+    )
     return leg
 
 
@@ -189,14 +227,13 @@ def build_all():
     Returns
     -------
     list of tuple
-        ``[(name, shape, (r, g, b), visible, transparency)]`` matching the macro's part
-        tuple, or an empty list when ``SHOW_ALT_STAND`` is false. ``place_stand`` in
-        :mod:`box_insert` repositions these into the box.
+        ``[(name, shape, (r, g, b), visible, transparency)]``; empty when ``SHOW_ALT_STAND``
+        is false. ``place_stand`` in :mod:`box_insert` repositions these into the box.
     """
     if not cfg.SHOW_ALT_STAND:
         return []
-    assert L_LEG > D_LEG * math.sin(_THETA), "leg too short to reach the table at the lock angle"
-    assert D_LEG + L_LEG < SHELF_H, "prop leg fuses into the shelf top; shorten ALT_LEG_LENGTH"
+    assert L_LEG > CROSS_Y * math.sin(_THETA), "leg too short to reach the table at the lock angle"
+    assert CROSS_Y + L_LEG < SHELF_H, "leg does not fit folded between the crossmember and top"
     tr = cfg.ALT_STAND_TRANSPARENCY
     parts = []
     for name, shape, rgb in (
