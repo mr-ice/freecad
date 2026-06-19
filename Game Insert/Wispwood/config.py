@@ -1,8 +1,7 @@
 """Configuration constants for the Wispwood tile holder (custom design).
 
 All dimensions are in millimetres and all angles in degrees unless noted. Values
-reverse-engineered from the reference model in ``gepesso/`` are tagged ``SOURCE``;
-values that are design assumptions pending confirmation are tagged ``ASSUMED``.
+that are design assumptions pending confirmation are tagged ``ASSUMED``.
 
 The public API of this module is the set of module-level constants below; downstream
 modeling code imports them and must not hard-code measured coordinates (see the
@@ -22,9 +21,9 @@ STACK_LENGTH_SLACK = 8.0  # extra length so a full 80-tile stack slides freely
 TILE_DEPTH_CLEARANCE = 1.0  # extra pocket depth above the tile height
 
 # --- Pockets (derived) -------------------------------------------------------
-POCKET_WIDTH = TILE_SIZE + 2 * TILE_SIDE_CLEARANCE  # -> 38.0 (matches SOURCE)
-POCKET_LENGTH = TILES_PER_STACK * TILE_THICKNESS + STACK_LENGTH_SLACK  # ASSUMED tile_thk
-POCKET_DEPTH = TILE_SIZE + TILE_DEPTH_CLEARANCE  # ~37; SOURCE interior depth ~39
+POCKET_WIDTH = TILE_SIZE + 2 * TILE_SIDE_CLEARANCE  # ~38
+POCKET_LENGTH = TILES_PER_STACK * TILE_THICKNESS + STACK_LENGTH_SLACK # ~178.64
+POCKET_DEPTH = TILE_SIZE + TILE_DEPTH_CLEARANCE  # ~37
 
 # --- Walls / structure -------------------------------------------------------
 WALL_LONG = 4.0  # SOURCE: long-side outer walls
@@ -33,7 +32,7 @@ FLOOR_THICKNESS = 3.0  # SOURCE
 DIVIDER_THICKNESS = 2.0  # SOURCE: centre divider between the two pockets
 
 # --- Lid ---------------------------------------------------------------------
-LID_THICKNESS = 2.0  # SOURCE
+LID_THICKNESS = 2.5
 LID_SPLIT_TILE = 65  # large lid covers tiles 1..LID_SPLIT_TILE; small lid covers the rest
 DISPENSE_GAP = TILE_THICKNESS + 0.6  # how far the lid slides back to release one tile
 RAIL_DEPTH = 1.5  # how far the lid edge sits into the side rail groove
@@ -43,12 +42,17 @@ RAIL_DEPTH = 1.5  # how far the lid edge sits into the side rail groove
 # retaining lip a clean 45 deg overhang that prints without support. The lid's outer tip
 # is then LID_THICKNESS - LID_BEVEL thick (~0.5 mm) -- raise LID_THICKNESS if too fragile.
 LID_BEVEL = RAIL_DEPTH  # 45 deg chamfer on the lid's top sliding edges (== groove depth)
-LID_SLIDE_CLEARANCE = 0.3  # tolerance grown around the lid to cut the tray slot (the fit)
+LID_SLIDE_CLEARANCE = 0.2  # tolerance grown around the lid to cut the tray slot (the fit)
 # Extra lid width (total across both rail edges; half is added per side) that grows ONLY the
 # lid, not the slot, so the side clearance shrinks from LID_SLIDE_CLEARANCE to a tighter
 # friction fit. Raised because the lid slid well but did not stay put.
 LID_WIDTH_FRICTION = 0.4
 LID_TOP_LIP = 1.0  # wall lip above the lid that retains it from lifting
+# The tray's lid slot stops short of the front by this distance above the inside surface of
+# the front wall, forming a stop that leaves a top-front dispensing gap. The large lid has a
+# reversible end cutout: inserted that end first, the lid passes the stop and closes the gap
+# (storage); reversed, it stops here, leaving the gap open to dispense one tile.
+LID_FRONT_STOP_GAP = TILE_THICKNESS + 1.0
 
 # End walls (front and back) are identical: both rise to the lid underside (full pocket
 # depth) so the flat lid can slide out either end and is held only by rail friction.
@@ -56,7 +60,7 @@ LID_TOP_LIP = 1.0  # wall lip above the lid that retains it from lifting
 END_WALL_HEIGHT = POCKET_DEPTH  # top flush with the lid underside (~36 mm)
 
 # --- Finger scoops (both end walls, one per pocket) -------------------------
-SCOOP_WIDTH = 24.0  # ASSUMED: width of the thumb scoop (pocket is POCKET_WIDTH wide)
+SCOOP_WIDTH = 24.0  # width of the thumb scoop (pocket is POCKET_WIDTH wide)
 SCOOP_DEPTH_FRACTION = 0.8  # scoop reaches ~80% of the pocket depth from the top down
 SCOOP_CHAMFER = 1.0  # chamfer on the scoop's outer-face and top edges (finger comfort)
 
@@ -66,7 +70,12 @@ SCOOP_CHAMFER = 1.0  # chamfer on the scoop's outer-face and top edges (finger c
 # substantial oval peg that rides a complex slot in the tray's outer side wall. Modelled
 # FOLDED; the path/lock still need tuning vs a print.
 STAND_THICKNESS = 3.0  # leg and base-panel thickness
-STAND_LEG_LENGTH_FRAC = 0.5  # legs span half the tray length
+# Single knob for the deployed tilt / balance: longer legs reach further back and lift the
+# raised end higher, moving the assembly's centre of gravity UP and BACK. The whole stand
+# slot (folded peg rest, vertex/hinge, jog, lock) is derived from STAND_LEG_LEN in
+# wispwood.py, so changing this fraction moves the leg AND the slot together and they stay
+# aligned (the peg's back margin stays constant). Stays in-bounds through ~0.7; tune to taste.
+STAND_LEG_LENGTH_FRAC = 0.6  # fraction of the tray length spanned by each leg
 STAND_LEG_WIDTH = 16.0  # leg width (Z extent), centred on the peg
 STAND_BASE_DEPTH = 8.0  # base-panel thickness along Y (the foot)
 STAND_CHAMFER = 5.0  # chamfer/gusset at the leg-to-base junction
@@ -85,10 +94,86 @@ STAND_BODY_GAP = 0.2
 # "parallel" arm to its end, a short vertical jog up (so the peg lifts before locking),
 # then a short tilted "top" arm to the lock. This jog+short-arm is the lock detent.
 STAND_SLOT_ARM_LEN = 24.0  # length of the horizontal (parallel) arm
-STAND_V_ANGLE_DEG = 20.0  # tilt of the top arm above horizontal
+STAND_V_ANGLE_DEG = 15.0  # tilt of the top arm above horizontal
 STAND_JOG_FRAC = 0.5  # vertical jog at the vertex = this * peg width (the lift)
 STAND_ARM2_FRAC = 1.5  # top (lock) arm length = this * peg length (significantly shorter)
 
+# --- Alternate stand (separate, triangular frame: shelf + base + leg) --------
+# Fresh design. A triangular frame of three parts: the SHELF (holds the
+# tray on LIPs), the BASE (sits on the table), and the LEG (props them
+# apart in a triangle).  Built up part by part; this section defines the
+# SHELF.
+#
+# Shelf: a rounded-rectangle plate, ALT_SHELF_THICKNESS thick, ALT_SHELF_HEIGHT tall and wide
+# enough to clear the tray between the side lips (width = tray + 2*side-lip + 2*side-clear). A
+# cross-lip across the bottom of the top surface holds the tray; two side lips on the outer
+# edges steady it; the two bottom corners are raised and filleted into a cup. The unused centre
+# of the plate is cut away, leaving a border frame.
+SHOW_ALT_STAND = True
+ALT_SHELF_THICKNESS = 7.0  # shelf plate thickness (the leg nests fully inside this, not the lips)
+ALT_SHELF_SIDE_CLEAR = 0.1  # per-side gap between the tray and the side lips
+ALT_SHELF_HEIGHT = 80.0  # shelf length the tray lies against (above the lip)
+# Frame extension below the cross-lip, down toward the base. Deployed, the shelf sits 15 deg
+# off vertical, so this is the SLANT length along the angled frame (vertical drop = x*cos15).
+# ~15 mm puts the top of the lip ~18 mm (slant) above the table so the tray's front-top edge
+# lands ~28 mm off the table. See ALT_SHELF_HEIGHT for the above-lip part.
+ALT_SHELF_BELOW_LIP = 25.0  # slant length of frame below the lip (toward the base)
+ALT_SHELF_CORNER_R = 5.0  # rounded-rectangle corner radius
+ALT_SHELF_BORDER = 10.0  # frame border left after cutting the unused centre out (stocky)
+ALT_SHELF_CROSS_LIP_H = 3.0  # bottom cross-lip height above the surface (holds the tray)
+ALT_SHELF_CROSS_LIP_T = 7.0  # bottom cross-lip thickness (along the height)
+ALT_SHELF_SIDE_LIP_W = 3.0  # side steadying-lip width (matched to the cross-lip thickness)
+ALT_SHELF_SIDE_LIP_H = 3.0  # side steadying-lip height above the surface
+# The two bottom corners (cross-lip meets side-lip) are raised to this fraction of the tray
+# height, then filleted back down to the cross-lip and the side-lip on each side, making a
+# deeper cup that cradles the tray's bottom corners.
+ALT_SHELF_CORNER_H_FRAC = 0.5  # corner-post height as a fraction of the tray height (~1/2)
+
+# Leg (the prop): nests FULLY INSIDE the shelf plate, in a pocket cut in the back, free of all
+# other structure except a print-in-place hinge just above the cross-lip. It swings out to
+# prop the stand; its free end is a flattened cylinder forming a T, for locking upright later.
+ALT_LEG_LENGTH = 60.0  # hinge axis to the T crossbar (fits folded within the shelf height)
+ALT_LEG_WIDTH = 24.0  # leg-bar width (across) = hinge span
+ALT_LEG_THICK = 7.0  # leg-bar thickness (<= plate thickness so it sits recessed inside)
+ALT_LEG_HINGE_GAP = 2.0  # gap above the cross-lip to the hinge axis
+ALT_LEG_POCKET_CLEAR = 0.4  # clearance around the leg in its opening (so it stays free)
+ALT_LEG_T_LEN = 60.0  # T crossbar length (across)
+ALT_LEG_T_DIA = 8.0  # T crossbar cylinder diameter before flattening
+ALT_LEG_T_THICK = 7.0  # T crossbar flattened thickness (fits the leg thickness)
+
+# Print-in-place hinge: interleaved knuckles on a single pin. Odd segment count so the ends
+# are PLATE knuckles (the pin anchors to the plate there); LEG knuckles ride the pin between
+# them. Gaps are the print clearances that keep the leg free.
+ALT_HINGE_SEGMENTS = 5  # knuckle segments across the hinge (plate at the ends, alternating)
+ALT_HINGE_R = 3.5  # knuckle outer radius (Ø7 mm = the full plate thickness)
+ALT_HINGE_PIN_R = 1.5  # pin radius (Ø3 mm; the pin is part of the plate)
+ALT_HINGE_PIN_CLEAR = 0.4  # radial clearance of the leg-knuckle bore around the pin (comfortable)
+ALT_HINGE_AXIAL_CLEAR = 0.3  # axial gap between leg and plate knuckles
+# Where two parts overlap in plan (base leg ↔ shelf cross, base crossbar ↔ prop leg) they
+# share the thickness ~47/47: one keeps the back ~47%, the other the front ~47%, with this gap
+# between so they print free. Each part = (thickness - gap) / 2.
+ALT_SPLIT_GAP = 0.4
+
+# Base (the foot): a second print-in-place hinge centred in the shelf's bottom border (same
+# Ø7 knuckles / Ø3 pin, knuckles subdivided to match the prop-leg hinge). Two legs run up
+# through the shelf flanking the prop leg, stopping short of its T; a crossbar high up (under
+# the prop leg, via the 47/47 split) joins them into one part.
+ALT_BASE_LEG_WIDTH = 14.0  # each base-leg width (across)
+ALT_BASE_LEG_CLEAR = 3.0  # clearance from the prop leg and the slot walls
+ALT_BASE_T_GAP = 3.0  # base legs stop this far short of the prop T
+ALT_BASE_CROSS_WIDTH = 8.0  # crossbar length along the leg
+ALT_BASE_CROSS_INSET = 6.0  # crossbar pulled back from the base-leg tops (toward the hinge)
+ALT_STAND_TRANSPARENCY = 0  # FreeCAD view only
+
 # --- Tolerances / print ------------------------------------------------------
 GENERAL_CLEARANCE = 0.2  # default fit clearance for mating printed parts
-MAX_PRINTER_DIMENSION = 256.0  # ASSUMED build-plate limit; keep parts within this
+MAX_PRINTER_DIMENSION = 240.0  # build-plate limit; keep parts within this (MK4 : 240, XL : 350)
+
+# --- Display (FreeCAD view only; no effect on geometry or the print) ---------
+# Percent transparency (0 opaque .. 100 invisible) applied to the tray and lid parts so the
+# tiles, fit, and stand slot can be seen through them; other parts stay opaque.
+TRAY_LID_TRANSPARENCY = 80
+# A second, NON-PRINTING ghost copy of the stand posed at the slot's lock (deployed)
+# position, for visual comparison against the folded stand. Display-only -- do not export it.
+SHOW_STAND_DEPLOYED = True
+STAND_DEPLOYED_TRANSPARENCY = 55  # ghost transparency so it reads as a reference, not a part

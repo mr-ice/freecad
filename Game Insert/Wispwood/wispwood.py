@@ -14,10 +14,12 @@ Mechanism
 ---------
 - The tray has two equal-height solid **end walls** (front and back), each rising to the
   lid underside, with a deep **finger scoop** per pocket for tile access from either end.
-- The **lid** is a flat plate that slides in the full-length side rails and can slide out
-  **either end**; rail friction holds it in place during play and storage. Sliding it back
-  by ``DISPENSE_GAP`` opens a top-front gap; with the tray tilted/suspended (by the
-  folding stand) the front tile slides up and out through that gap into the user's hand.
+- The **lid** is a flat plate that slides in the side rails, inserted/removed at the **back**.
+  The rails stop short of the front by ``LID_FRONT_STOP_GAP`` above the inside front surface,
+  forming a stop that leaves a top-front **dispensing gap**. The large lid has a **reversible
+  end cutout**: inserted cutout-end first it passes the stop and **closes the gap** (storage);
+  reversed, it stops at the rail and **leaves the gap open**, so with the tray tilted/suspended
+  by the folding stand the front tile slides up and out through that gap into the user's hand.
 - A **folding stand** of two rounded-end legs (half the tray length) joined by a front
   base panel that covers them (chamfered gussets at the junction). Each leg's oval peg
   rides a slot in the tray side wall: along the horizontal **parallel arm** to the vertex
@@ -35,7 +37,7 @@ clean 45 deg overhang that prints without support (no downward-pointing lip).
 Public API
 ----------
 ``build_tray``, ``build_large_lid``, ``build_small_lid``, ``build_lid_slot_cutter``,
-``build_stand``, ``build_all``.
+``build_stand``, ``build_stand_deployed``, ``build_all``.
 
 All offsets are derived from named constants (never measured coordinates), per the
 repository rules.
@@ -71,8 +73,11 @@ RIGHT_POCKET_X1 = RIGHT_POCKET_X0 + cfg.POCKET_WIDTH
 # --- Derived lid extents -----------------------------------------------------
 LID_X0 = cfg.WALL_LONG - cfg.RAIL_DEPTH  # lid edge reaches into the side grooves
 LID_X1 = INNER_X1 + cfg.RAIL_DEPTH
-RAIL_Y0 = 0.0  # rails run the full length so the lid can slide out either end
-RAIL_Y1 = OUTER_LENGTH
+# The lid slot is open at the BACK (lid inserts/removes there) but stops short of the front
+# by LID_FRONT_STOP_GAP above the inside front surface; that stop leaves a top-front
+# dispensing gap (which the large lid's reversible end cutout can pass to close).
+LID_SLOT_Y0 = POCKET_Y0 + cfg.LID_FRONT_STOP_GAP  # front stop of the slot
+LID_SLOT_Y1 = OUTER_LENGTH  # open back end
 LARGE_LID_Y1 = POCKET_Y0 + cfg.LID_SPLIT_TILE * cfg.TILE_THICKNESS
 
 # Pocket centres (X) used for the finger scoops.
@@ -177,16 +182,17 @@ def _lid_xsection(clearance, width_inflate=0.0):
 def build_lid_slot_cutter():
     """Return the tool that cuts the lid slot in the tray (lid section + clearance).
 
-    It is the lid cross-section grown by ``LID_SLIDE_CLEARANCE`` and swept the full tray
-    length, so subtracting it from the tray yields a slot that fits the lid exactly. Also
-    exposed on its own (hidden) so it can be inspected in FreeCAD.
+    It is the lid cross-section grown by ``LID_SLIDE_CLEARANCE`` and swept from the front
+    stop (``LID_SLOT_Y0``) to the open back (``LID_SLOT_Y1``), so subtracting it from the tray
+    yields a slot that fits the lid exactly and stops short of the front. Also exposed on its
+    own (hidden) so it can be inspected in FreeCAD.
 
     Returns
     -------
     Part.Shape
         The slot cutter solid.
     """
-    return _prism_xz(_lid_xsection(cfg.LID_SLIDE_CLEARANCE), RAIL_Y0, RAIL_Y1 - RAIL_Y0)
+    return _prism_xz(_lid_xsection(cfg.LID_SLIDE_CLEARANCE), LID_SLOT_Y0, LID_SLOT_Y1 - LID_SLOT_Y0)
 
 
 def _finger_scoop(cx, wall_y0):
@@ -312,15 +318,52 @@ def _lid_prism(y0, y1):
     return _prism_xz(_lid_xsection(0.0, cfg.LID_WIDTH_FRICTION / 2.0), y0, y1 - y0)
 
 
+def _lid_end_cutout(y_front):
+    """Return the cutter that strips the rail tabs from one end of the large lid.
+
+    Removing the groove-engaging tabs over ``LID_FRONT_STOP_GAP`` of length on this end lets
+    it pass the tray's lid-slot stop, so the lid reaches the inside front surface and closes
+    the dispensing gap. Inserted the other way (plain end forward), the full tabs meet the
+    stop and the gap stays open. The cut also clears ``LID_SLIDE_CLEARANCE`` into the plate so
+    the stripped end slides between the (solid, ungrooved) long walls of the stop region.
+
+    Parameters
+    ----------
+    y_front : float
+        Y of the lid's cutout end face (mm).
+
+    Returns
+    -------
+    Part.Shape
+        The cutout tool (the two side strips).
+    """
+    clr = cfg.LID_SLIDE_CLEARANCE
+    m = 1.0  # over-cut margin so the end and top/bottom faces are cleanly removed
+    y0 = y_front - m
+    ylen = cfg.LID_FRONT_STOP_GAP + m  # back face lands exactly at the slot stop
+    z0 = LID_Z0 - m
+    zlen = (LID_Z1 + m) - z0
+    left = _box(LID_X0 - m, y0, z0, (cfg.WALL_LONG + clr) - (LID_X0 - m), ylen, zlen)
+    right_x0 = INNER_X1 - clr
+    right = _box(right_x0, y0, z0, (LID_X1 + m) - right_x0, ylen, zlen)
+    return left.fuse(right)
+
+
 def build_large_lid():
-    """Build the large (game-use) flat lid covering the front through tile ``LID_SPLIT_TILE``.
+    """Build the large (game-use) flat lid: pocket front through tile ``LID_SPLIT_TILE``.
+
+    Spans the pocket interior from the inside front surface (``POCKET_Y0``) back to the lid
+    split, with a reversible end cutout (:func:`_lid_end_cutout`). Inserted cutout-end first,
+    the lid passes the tray's slot stop and closes the dispensing gap (storage); reversed, it
+    stops at the slot, leaving the gap open. Built in the closed (gap-closed) position.
 
     Returns
     -------
     Part.Shape
         The large lid solid.
     """
-    return _lid_prism(0.0, LARGE_LID_Y1)
+    lid = _lid_prism(POCKET_Y0, LARGE_LID_Y1)
+    return lid.cut(_lid_end_cutout(POCKET_Y0))
 
 
 def build_small_lid():
@@ -484,19 +527,70 @@ def build_stand():
     return left_leg.fuse(right_leg).fuse(base).fuse(gussets).fuse(left_peg).fuse(right_peg)
 
 
+def build_stand_deployed():
+    """Return a NON-PRINTING copy of the stand posed at the slot's lock (second) position.
+
+    The oval peg's major axis is constrained to the slot-channel direction, so between the
+    folded rest (horizontal "parallel" arm) and the lock detent (tilted "top" arm) the rigid
+    body rotates by ``STAND_V_ANGLE_DEG`` about the peg axis (parallel to ``X``). This builds
+    the stand, rotates it by that angle about the peg axis through the folded peg centre,
+    then carries the peg centre to the seated lock position. It is a view-only reference for
+    comparing the folded and deployed poses -- not a part to print.
+
+    ``STAND_LOCK`` is the top arm's *centreline* end; the slot's rounded top (the end cap)
+    extends one detent radius further along the arm, so the seated peg centre is advanced by
+    that radius to sit at the true top of the detent.
+
+    Returns
+    -------
+    Part.Shape
+        The stand solid transformed to the lock position.
+    """
+    shape = build_stand()
+    fy, fz = STAND_FOLDED
+    # Advance the lock target by one detent radius along the top-arm direction so the peg
+    # seats at the rounded top of the slot (STAND_LOCK is the arm's centreline end).
+    arm_y, arm_z = math.cos(_STAND_VA), math.sin(_STAND_VA)  # top-arm unit dir in (Y, Z)
+    detent_r = (cfg.STAND_PEG_WIDTH + cfg.STAND_SLOT_CLEARANCE) / 2.0
+    ly = STAND_LOCK[0] + detent_r * arm_y
+    lz = STAND_LOCK[1] + detent_r * arm_z
+    # Rotate about the peg axis (parallel to X) through the folded peg centre, so the oval
+    # aligns with the top arm, then carry the peg centre to the seated lock position.
+    shape.rotate(Vector(0.0, fy, fz), Vector(1.0, 0.0, 0.0), cfg.STAND_V_ANGLE_DEG)
+    shape.translate(Vector(0.0, ly - fy, lz - fz))
+    return shape
+
+
 def build_all():
     """Build every part in assembled position, ready to add to a document.
 
     Returns
     -------
     list of tuple
-        ``(name, shape, (r, g, b), visible)`` for each part. ``LidSlotCutter`` is the
-        (hidden) tool used to cut the tray's lid slot, exposed for inspection.
+        ``(name, shape, (r, g, b), visible, transparency)`` for each part, where
+        ``transparency`` is a view-only percent (0 opaque .. 100 invisible). The tray and
+        lids are made ``TRAY_LID_TRANSPARENCY`` so the tiles/fit show through; the rest are
+        opaque. ``LidSlotCutter`` is the (hidden) tool used to cut the tray's lid slot,
+        exposed for inspection. When ``SHOW_STAND_DEPLOYED`` is set, a non-printing
+        ``StandDeployed`` ghost (the stand posed at the lock position) is appended for
+        visual comparison -- do not export it.
     """
-    return [
-        ("Tray", build_tray(), (0.80, 0.80, 0.82), True),
-        ("LidLarge", build_large_lid(), (0.20, 0.45, 0.85), True),
-        ("LidSmall", build_small_lid(), (0.25, 0.70, 0.40), True),
-        ("Stand", build_stand(), (0.90, 0.50, 0.15), True),
-        ("LidSlotCutter", build_lid_slot_cutter(), (0.90, 0.25, 0.25), False),
+    tlt = cfg.TRAY_LID_TRANSPARENCY
+    parts = [
+        ("Tray", build_tray(), (0.80, 0.80, 0.82), True, tlt),
+        ("LidLarge", build_large_lid(), (0.20, 0.45, 0.85), True, tlt),
+        ("LidSmall", build_small_lid(), (0.25, 0.70, 0.40), True, tlt),
+        ("Stand", build_stand(), (0.90, 0.50, 0.15), True, 0),
+        ("LidSlotCutter", build_lid_slot_cutter(), (0.90, 0.25, 0.25), False, 0),
     ]
+    if cfg.SHOW_STAND_DEPLOYED:
+        parts.append(
+            (
+                "StandDeployed",
+                build_stand_deployed(),
+                (0.15, 0.85, 0.85),
+                True,
+                cfg.STAND_DEPLOYED_TRANSPARENCY,
+            )
+        )
+    return parts

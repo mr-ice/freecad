@@ -30,18 +30,25 @@ Measured from `gepesso/wispwood-tile-holder/*.stl` (binary STL bounding boxes + 
 - Two side-by-side pockets, 80 tiles each, comfortable low-friction fit on the tile
   width and free sliding along the stack length.
 - **Two equal-height end walls** (`END_WALL_HEIGHT`), front and back, both rising to the
-  lid underside (full pocket depth) so the lid can slide out **either end**.
-- Full-length lid rails, **beveled** (45° lip underside) so the tray prints without
-  support; **rail friction** holds the lid in place during play and storage.
+  lid underside (full pocket depth).
+- Lid rails, **beveled** (45° lip underside) so the tray prints without support; **rail
+  friction** holds the lid in place during play and storage. The rails are open at the
+  **back** (lid inserts/removes there) and **stop short of the front** by `LID_FRONT_STOP_GAP`
+  (one tile thickness + 1 mm) above the inside front surface — the stop that leaves the
+  dispensing gap.
 
 ### Two-part sliding / dispensing lid
 - A **flat** plate (no walls closing off the columns), split into **two parts** that
   share the rails and have **beveled top sliding edges** for clean printing/entry:
   - **Large part (game use):** covers the front through **~tile 65**.
   - **Small part (storage):** seals the remaining **~65 → 80** region.
-- During play, sliding the large lid **back** by one tile (`DISPENSE_GAP`) opens a gap at
-  the **top-front**. With the rack tilted/suspended, the front tile **slides up and out
-  through that gap, over the front wall, into the operator's hand**.
+- **Reversible large lid (dispense vs. closed):** the rails stop `LID_FRONT_STOP_GAP` short
+  of the inside front surface, so a full-tabbed lid always stops there, leaving a top-front
+  gap. The large lid has a **cutout on one end** that strips the rail tabs over that same
+  length, so inserted **cutout-end first** it passes the stop and reaches the inside front
+  surface, **closing the gap** (storage). Inserted the **other way**, it stops at the rail,
+  **leaving the gap open**: with the rack tilted/suspended the front tile **slides up and out
+  through that gap into the operator's hand**.
 - **Single-source fit:** the lid cross-section is defined once; the tray's lid slot is the
   *same* section grown by `LID_SLIDE_CLEARANCE` and cut from the tray, so the fit is exact
   and edited in one place. The slot cutter is emitted as a hidden `LidSlotCutter` object
@@ -58,7 +65,8 @@ Measured from `gepesso/wispwood-tile-holder/*.stl` (binary STL bounding boxes + 
 - **Not on the long sides** — that area is reserved for the folding stand.
 
 ### Folding stand
-- Two **legs** (each **half the tray length**) with **rounded free ends**, centred
+- Two **legs** (length = `STAND_LEG_LENGTH_FRAC` × tray length, currently **0.6**) with
+  **rounded free ends**, centred
   vertically on the box, joined by a **front base panel** made **a little wider than the
   box front so it covers the legs**, with **chamfered gussets** at the leg/base junctions.
 - Each leg carries a **substantial oval peg** (`STAND_PEG_LENGTH`×`STAND_PEG_WIDTH`) at the
@@ -74,6 +82,57 @@ Measured from `gepesso/wispwood-tile-holder/*.stl` (binary STL bounding boxes + 
 - **Anti-fuse gap:** each leg's inner face is offset from the tray's outer wall by
   `STAND_BODY_GAP` (0.2 mm) so the folded-modelled legs do not print fused to the tray
   body; the oval pegs are lengthened to bridge the gap and still seat fully in the slot.
+- **Balance knob:** `STAND_LEG_LENGTH_FRAC` is the single parameter for the deployed
+  balance — longer legs move the centre of gravity **up and back**. The entire slot path is
+  derived from the leg length, so the leg and slot move together and stay aligned (the
+  peg's back margin is constant); it stays in-bounds through ~0.7.
+- **Deployed ghost (display-only):** with `SHOW_STAND_DEPLOYED`, a **non-printing**
+  `StandDeployed` copy is shown at the lock (second) position for visual comparison. Because
+  the oval peg's major axis follows the slot-channel direction, the lock pose is the stand
+  rotated by `STAND_V_ANGLE_DEG` about the peg axis and carried to the seated lock position
+  — one detent radius past `STAND_LOCK` (the arm's centreline end) so the peg sits at the
+  rounded top of the slot. Do not export it.
+
+### Alternate stand (separate, triangular frame) — `alt_stand.py`
+The integrated stand is too big to fit in the box on the tray, so this is a **standalone**
+stand stored off the tray. It is a **triangular frame** of three parts — the **shelf** (holds
+the tray), the **base** (on the table), and the **leg** (props them apart) — built up one part
+at a time.
+- **Shelf:** a **rounded-rectangle** plate, `ALT_SHELF_THICKNESS` (2 mm) thick,
+  `ALT_SHELF_WIDTH_OVER_TRAY` (3 mm) wider than the tray, `ALT_SHELF_HEIGHT` (~80 mm) tall. On
+  the top surface: a **cross-lip** across the bottom that the tray rests against, and two
+  **side lips** above it on the outer edges (`ALT_SHELF_SIDE_LIP_W` 1.4 mm × `…_H` 3 mm) that
+  steady the tray — their inner gap clears the 86 mm tray by 0.1 mm/side. The two bottom
+  **corners are raised** to `ALT_SHELF_CORNER_H_FRAC` (~½ the tray height, ≈21 mm) and
+  **filleted** (r ≈ 18 mm) back down to the cross-lip and side-lips, making a deeper cup that
+  cradles the tray's bottom corners. The unused centre — of both the tray region and the
+  below-lip extension — is cut out, leaving a **border frame** (`ALT_SHELF_BORDER`).
+- **Below-lip extension:** the frame extends `ALT_SHELF_BELOW_LIP` (~15 mm, slant) below the
+  lip toward the base. Deployed at 15° off vertical that lifts the top of the lip ~17 mm so
+  the tray's front-top edge lands ~28 mm off the table (`front_edge = lip_vert + H_tray·sin15`).
+- **Stocky frame:** plate `ALT_SHELF_THICKNESS` 4 mm, border `ALT_SHELF_BORDER` 10 mm; side
+  lips widened to 3 mm (matched to the cross-lip), so the shelf width is now derived as
+  tray + 2 side lips + 2 `ALT_SHELF_SIDE_CLEAR` = 92.2 mm (86.2 mm inner gap for the tray).
+- **Stocky base:** plate `ALT_SHELF_THICKNESS` now **7 mm** (not counting lips), so the leg
+  nests fully inside it.
+- **Leg (`build_leg`):** a prop bar that nests **fully inside the 7 mm** plate's central
+  opening (recessed, free of all structure) and joins the plate by a **print-in-place hinge**
+  just above the cross-lip — interleaved knuckles (`ALT_HINGE_SEGMENTS`, plate at the ends) on
+  a single pin. The knuckle body is **Ø7 mm** (`ALT_HINGE_R`, fills the full plate thickness)
+  on a **Ø3 mm** pin (`ALT_HINGE_PIN_R`, part of the plate); leg knuckles bored
+  `ALT_HINGE_PIN_CLEAR` (0.4 mm) over it → ~1.6 mm walls, with `ALT_HINGE_AXIAL_CLEAR` between
+  knuckles — all gaps are the print clearances that keep it free. The far end is a **flattened cylinder forming a T** (`ALT_LEG_T_*`) for
+  locking upright. Shown as `AltLeg`.
+- **Base (`build_base`):** the foot — **two legs** on print-in-place hinges **centred in the
+  shelf's bottom border** (knuckles subdivided to match the prop-leg hinge width), running up
+  through the shelf flanking the prop leg (`ALT_BASE_LEG_WIDTH`, `ALT_BASE_LEG_CLEAR`),
+  **stopping short of the T** (`ALT_BASE_T_GAP`), joined by a **high crossbar**
+  (`ALT_BASE_CROSS_INSET` below the leg tops). **Shared-thickness (~47/47) cuts** (`ALT_SPLIT_GAP`
+  0.4 mm): where a leg crosses the lip-band cross it keeps the back ~47% and the shelf keeps the
+  front (cross-lip support); where the crossbar passes under the prop leg it takes the back ~47%
+  and the prop leg the front. Shown as `AltBase`. The **upright lock** (T ↔ base) is next.
+- **Current model:** the **shelf** part, shown beside the tray (`SHOW_ALT_STAND`), fully
+  parametric (`ALT_SHELF_*`).
 
 ### Finger-scoop chamfers
 - The scoops' **outer-face and top edges** are chamfered (`SCOOP_CHAMFER`) for finger
@@ -110,3 +169,8 @@ Measured from `gepesso/wispwood-tile-holder/*.stl` (binary STL bounding boxes + 
 - [x] Folding stand: V-slot + oval-peg legs + base bar (folded; kinematics need tuning)
 - [x] Print 1 fit fixes: lid friction width + leg anti-fuse gap (config-driven)
 - [ ] Re-print to confirm lid holds position and legs separate cleanly
+- [x] Alternate stand (restart): triangular frame — shelf (lips, corner cups, below-lip ext)
+- [x] Alternate stand: leg part (print-in-place hinge above lip + flattened-cylinder T end)
+- [x] Alternate stand: base part (two legs on a bottom-edge hinge, flanking the leg)
+- [ ] Alternate stand: the upright lock (T ↔ base legs) + verify the print-in-place hinges
+- [ ] Alternate stand: confirm dims against a print

@@ -33,18 +33,23 @@ importlib.reload(config)
 import wispwood  # noqa: E402
 
 importlib.reload(wispwood)
+import alt_stand  # noqa: E402
+
+importlib.reload(alt_stand)
 
 # Recreate the document from scratch.
 if DOC_NAME in App.listDocuments():
     App.closeDocument(DOC_NAME)
 doc = App.newDocument(DOC_NAME)
 
-for name, shape, rgb, visible in wispwood.build_all():
+parts = list(wispwood.build_all()) + list(alt_stand.build_all())
+for name, shape, rgb, visible, transparency in parts:
     obj = doc.addObject("Part::Feature", name)
     obj.Shape = shape
     if obj.ViewObject is not None:
         obj.ViewObject.ShapeColor = rgb
         obj.ViewObject.Visibility = visible
+        obj.ViewObject.Transparency = transparency
 
 doc.recompute()
 
