@@ -30,19 +30,29 @@ if _macro_dir not in sys.path:
 import config  # noqa: E402
 
 importlib.reload(config)
+import derived  # noqa: E402
+
+importlib.reload(derived)
 import wispwood  # noqa: E402
 
 importlib.reload(wispwood)
 import alt_stand  # noqa: E402
 
 importlib.reload(alt_stand)
+import box_insert  # noqa: E402
+
+importlib.reload(box_insert)
 
 # Recreate the document from scratch.
 if DOC_NAME in App.listDocuments():
     App.closeDocument(DOC_NAME)
 doc = App.newDocument(DOC_NAME)
 
-parts = list(wispwood.build_all()) + list(alt_stand.build_all())
+parts = (
+    list(wispwood.build_all())
+    + list(alt_stand.build_all())
+    + list(box_insert.build_all())
+)
 for name, shape, rgb, visible, transparency in parts:
     obj = doc.addObject("Part::Feature", name)
     obj.Shape = shape
