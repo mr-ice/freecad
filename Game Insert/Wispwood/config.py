@@ -136,6 +136,10 @@ ALT_CROSS_Y = 24.0  # shelf crossmember Y (tray sits here; the leg hinges on it)
 ALT_TRAY_LIP_H = 3.0  # lip height above the shelf face that catches the tray bottom edge
 ALT_BASE_FOOT = 12.0  # base length past the lock line (foot)
 ALT_BASE_CROSS_W = 9.0  # base/leg crossmember width along the part
+ALT_FRAME_CORNER_R = 8.0  # shelf frame corner radius (continuous rounded rod path)
+ALT_LIP_EDGE_FRAC = 0.55  # tray lip height at the shelf edges, as a fraction of tray height
+ALT_LIP_LOW_H = 3.0  # tray lip height at the finger-groove centres (low, to clear scoops)
+ALT_LIP_T = 3.0  # tray lip thickness (along Y)
 
 SHOW_ALT_STAND = True
 ALT_SHELF_THICKNESS = 7.0  # shelf plate thickness (the leg nests fully inside this, not the lips)
