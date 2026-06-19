@@ -6,14 +6,14 @@ Y length, Z up). A non-printing box-reference shell is provided for fit checking
 
 All offsets derive from named constants (repo ``CLAUDE.md``); no measured coordinates.
 
-``place_wispwood`` / ``place_alt_stand`` position the parts built by the ``wispwood`` and
-``alt_stand`` modules (which are modelled in their own frames) into the box bays defined by
+``place_wispwood`` / ``place_stand`` position the parts built by the ``wispwood`` and
+``stand`` modules (which are modelled in their own frames) into the box bays defined by
 :func:`box_layout.bottom_regions`, so the whole packed box is viewable in one document.
 
 Public API
 ----------
 ``build_small_tray``, ``build_top_tray``, ``build_box_reference``, ``build_all``,
-``place_wispwood``, ``place_alt_stand``.
+``place_wispwood``, ``place_stand``.
 """
 
 import box_layout as bl
@@ -168,28 +168,28 @@ def place_wispwood(parts):
     return out
 
 
-def place_alt_stand(parts):
-    """Position the folded alt stand into the box's alt-stand bay, lying flat on the floor.
+def place_stand(parts):
+    """Position the stand into the box's stand bay (front-left of the bottom layer).
 
-    ``alt_stand.build_all`` offsets its parts beside the tray for standalone review; this
-    undoes that offset and shifts the folded stand (whose native ``Y`` starts at
-    ``-ALT_SHELF_BELOW_LIP``) into ``bottom_regions()['alt_bay']``.
+    ``stand.build_all`` offsets its parts beside the tray for standalone review; this undoes
+    that offset and shifts the stand (whose native ``Y`` starts at ``stand.NATIVE_Y_MIN``)
+    into ``bottom_regions()['alt_bay']``.
 
     Parameters
     ----------
     parts : list of tuple
-        The ``(name, shape, rgb, visible, transparency)`` tuples from ``alt_stand.build_all``.
+        The ``(name, shape, rgb, visible, transparency)`` tuples from ``stand.build_all``.
 
     Returns
     -------
     list of tuple
         The parts translated into the box frame.
     """
-    import alt_stand as a
+    import stand as s
 
     rect = bl.bottom_regions()["alt_bay"]
-    dx = rect.x - a.DISPLAY_X_OFFSET
-    dy = rect.y + cfg.ALT_SHELF_BELOW_LIP
+    dx = rect.x - s.DISPLAY_X_OFFSET
+    dy = rect.y - s.NATIVE_Y_MIN
     out = []
     for name, shape, rgb, visible, transparency in parts:
         shape.translate(Vector(dx, dy, 0.0))

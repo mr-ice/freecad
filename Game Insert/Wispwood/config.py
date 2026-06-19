@@ -116,6 +116,19 @@ STAND_ARM2_FRAC = 1.5  # top (lock) arm length = this * peg length (significantl
 # cross-lip across the bottom of the top surface holds the tray; two side lips on the outer
 # edges steady it; the two bottom corners are raised and filleted into a cup. The unused centre
 # of the plate is cut away, leaving a border frame.
+# --- Stand mechanism (redesigned barrel hinge + computed snap lock) ----------
+# The shelf bottom is a full-width barrel (Ø = plate thickness) with two narrowed neck bands;
+# the base hinges on it via two knuckles and a concave mating edge. The prop leg hinges up the
+# shelf and its tip snaps into a socket on the base; the socket position is COMPUTED so the
+# shelf locks at STAND_DEPLOY_ANGLE above the table.
+STAND_DEPLOY_ANGLE = 75.0  # locked shelf angle above the table (deg)
+ALT_BARREL_NECK_R = 2.0  # reduced barrel radius at the two base-knuckle bands
+ALT_BARREL_NECK_W = 12.0  # axial width of each base-knuckle band
+ALT_BARREL_NECK_FRACS = (0.28, 0.72)  # neck-band centres as a fraction of the shelf width
+ALT_LEG_HINGE_Y = 18.0  # prop-leg hinge distance up the shelf from the barrel axis
+ALT_SNAP_R = 2.0  # radius of the leg-tip snap bump and the base socket
+ALT_SNAP_CLEAR = 0.15  # snap interference (smaller = stronger click)
+
 SHOW_ALT_STAND = True
 ALT_SHELF_THICKNESS = 7.0  # shelf plate thickness (the leg nests fully inside this, not the lips)
 ALT_SHELF_SIDE_CLEAR = 0.1  # per-side gap between the tray and the side lips

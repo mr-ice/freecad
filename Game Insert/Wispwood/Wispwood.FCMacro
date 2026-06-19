@@ -36,9 +36,9 @@ importlib.reload(derived)
 import wispwood  # noqa: E402
 
 importlib.reload(wispwood)
-import alt_stand  # noqa: E402
+import stand  # noqa: E402
 
-importlib.reload(alt_stand)
+importlib.reload(stand)
 import box_layout  # noqa: E402
 
 importlib.reload(box_layout)
@@ -53,7 +53,7 @@ doc = App.newDocument(DOC_NAME)
 
 parts = (
     list(box_insert.place_wispwood(wispwood.build_all()))
-    + list(box_insert.place_alt_stand(alt_stand.build_all()))
+    + list(box_insert.place_stand(stand.build_all()))
     + list(box_insert.build_all())
 )
 for name, shape, rgb, visible, transparency in parts:
