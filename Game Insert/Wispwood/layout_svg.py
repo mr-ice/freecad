@@ -70,12 +70,18 @@ def generate_svg():
         "1P paw  |  score pad  |  booklet",
     ]
     for i, line in enumerate(note):
-        out.append(_text(4, cfg.BOX_L - 16 + i * 6, line, cls="note"))
+        out.append(_text(4, cfg.BOX_L - 24 + i * 6, line, cls="note"))
     out.append("</svg>\n")
     return "".join(out)
 
 
-def write_svg(path):
-    """Write the generated SVG to ``path``."""
+def write_svg(path: str) -> None:
+    """Write the generated SVG to a file.
+
+    Parameters
+    ----------
+    path : str
+        Destination file path; created or overwritten.
+    """
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(generate_svg())
