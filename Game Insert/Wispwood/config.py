@@ -234,7 +234,7 @@ BOARD_POCKET_SLACK = 5.0  # loose slack around the board-piece stack in the top-
 INSERT_WALL = 2.0  # well/divider wall thickness
 INSERT_FLOOR = 1.5  # tray floor thickness
 TOP_TRAY_DEPTH = 12.0  # top-tray height (board stack is the tallest content)
-FINGER_SCOOP_R = 12.0  # radius of the finger-access scoop notches in the trays
+FINGER_GROOVE_R = 8.0  # radius of the vertical finger grooves cut through the small-tray well walls
 SMALL_TRAY_RIM_Z = (
     FLOOR_THICKNESS + POCKET_DEPTH + LID_THICKNESS + LID_SLIDE_CLEARANCE + LID_TOP_LIP
 )  # = Wispwood WALL_TOP (~42.7); top tray rests flush on the Wispwood + small trays

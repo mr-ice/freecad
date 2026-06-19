@@ -6,13 +6,19 @@ Y length, Z up). A non-printing box-reference shell is provided for fit checking
 
 All offsets derive from named constants (repo ``CLAUDE.md``); no measured coordinates.
 
+``place_wispwood`` / ``place_alt_stand`` position the parts built by the ``wispwood`` and
+``alt_stand`` modules (which are modelled in their own frames) into the box bays defined by
+:func:`box_layout.bottom_regions`, so the whole packed box is viewable in one document.
+
 Public API
 ----------
-``build_small_tray``, ``build_top_tray``, ``build_box_reference``, ``build_all``.
+``build_small_tray``, ``build_top_tray``, ``build_box_reference``, ``build_all``,
+``place_wispwood``, ``place_alt_stand``.
 """
 
 import box_layout as bl
 import config as cfg
+import derived as d
 import Part
 from FreeCAD import Vector
 
@@ -35,8 +41,9 @@ def build_small_tray():
     """Build the bottom components tray: cats-on-edge slot, card well, round-token well.
 
     The tray outer walls rise to ``SMALL_TRAY_RIM_Z`` so the top tray rests flat across it
-    and the Wispwood tray. Wells are cut to each component's depth; a finger scoop notches
-    the card well for access.
+    and the Wispwood tray. Each well is cut to its component's depth and gets one vertical
+    finger groove cut through a side wall, running the full height of the hole, so a finger
+    can reach down beside the stack.
 
     Returns
     -------
@@ -55,9 +62,8 @@ def build_small_tray():
 
     # Cats on edge: full-height slot (35 deep) so the 35 mm faces stand vertical.
     cats = b["well_cats"]
-    block = block.cut(
-        _box(cats.x, cats.y, rim - cfg.CAT_SIZE - 1.0, cats.w, cats.h, cfg.CAT_SIZE + 2.0)
-    )
+    cats_floor = rim - cfg.CAT_SIZE
+    block = block.cut(_box(cats.x, cats.y, cats_floor - 1.0, cats.w, cats.h, cfg.CAT_SIZE + 2.0))
 
     # Round tokens: cylindrical well.
     rnd = b["well_round"]
@@ -68,12 +74,23 @@ def build_small_tray():
         Part.makeCylinder(r, rnd_depth + 1.0, Vector(cx, cy, rim - rnd_depth), Vector(0, 0, 1))
     )
 
-    # Finger scoop on the card well (a half-cylinder notch in the near wall).
-    block = block.cut(
-        Part.makeCylinder(
-            cfg.FINGER_SCOOP_R, card.w, Vector(card.x, card.y + card.h / 2.0, rim), Vector(1, 0, 0)
+    # One vertical finger groove per well: a Z-axis cylinder centred on a well side wall (its
+    # radius exceeds the wall, so it cuts through), spanning the full hole height. Each is
+    # placed on a side that backs onto tray body (not a neighbouring well): card +X, cats +Y,
+    # round +X.
+    for groove_cx, groove_cy, floor_z in (
+        (card.x + card.w, card.y + card.h / 2.0, rim - card_depth),  # card: right wall
+        (cats.x + cats.w / 2.0, cats.y + cats.h, cats_floor),  # cats: back (+Y) wall
+        (rnd.x + rnd.w, rnd.y + rnd.h / 2.0, rim - rnd_depth),  # round: right wall
+    ):
+        block = block.cut(
+            Part.makeCylinder(
+                cfg.FINGER_GROOVE_R,
+                (rim + 1.0) - floor_z,
+                Vector(groove_cx, groove_cy, floor_z),
+                Vector(0, 0, 1),
+            )
         )
-    )
     _assert_within_bed(block, "SmallTray")
     return block
 
@@ -84,7 +101,8 @@ def build_top_tray():
     A ``TOP_TRAY_DEPTH``-tall plate over the box footprint with two pockets cut directly
     from the cavity rects returned by :func:`box_layout.top_regions` (no further inset).
     The board pocket holds the 5 loose board pieces; the marker trough holds 4 markers along
-    Y. The 1st-player paw, score pad, and booklet lie loose on top (no pocket).
+    Y. The 1st-player paw, score pad, and booklet lie loose on top (no pocket). No finger
+    grooves — the board pieces and markers are flat and lift straight out.
 
     Returns
     -------
@@ -101,13 +119,6 @@ def build_top_tray():
         r = t[key]
         block = block.cut(_box(r.x, r.y, floor, r.w, r.h, depth))
 
-    # Finger scoop across the board-pocket mouth (half-cylinder trough at the top rim).
-    p = t["board_pocket"]
-    block = block.cut(
-        Part.makeCylinder(
-            cfg.FINGER_SCOOP_R, p.w, Vector(p.x, p.y + p.h / 2.0, depth), Vector(1, 0, 0)
-        )
-    )
     _assert_within_bed(block, "TopTray")
     return block
 
@@ -124,6 +135,64 @@ def build_box_reference():
     outer = _box(-wall, -wall, -wall, cfg.BOX_W + 2 * wall, cfg.BOX_L + 2 * wall, cfg.BOX_H + wall)
     inner = _box(0.0, 0.0, 0.0, cfg.BOX_W, cfg.BOX_L, cfg.BOX_H + 1.0)
     return outer.cut(inner)
+
+
+def place_wispwood(parts):
+    """Position native Wispwood parts into the box's wispwood bay; drop the integrated stand.
+
+    The Wispwood tray is modelled with its long axis along ``Y``; the box bay wants it along
+    ``X`` (``bottom_regions()['wispwood']``), so each part is rotated 90 deg about ``Z`` and
+    shifted back into ``+X``. The integrated folding stand (``Stand`` / ``StandDeployed``) is
+    dropped — the separate alt stand is used instead.
+
+    Parameters
+    ----------
+    parts : list of tuple
+        The ``(name, shape, rgb, visible, transparency)`` tuples from ``wispwood.build_all``.
+
+    Returns
+    -------
+    list of tuple
+        The kept parts, transformed into the box frame.
+    """
+    rect = bl.bottom_regions()["wispwood"]
+    out = []
+    for name, shape, rgb, visible, transparency in parts:
+        if name in ("Stand", "StandDeployed"):
+            continue
+        shape.rotate(Vector(0.0, 0.0, 0.0), Vector(0.0, 0.0, 1.0), 90.0)
+        shape.translate(Vector(d.OUTER_LENGTH + rect.x, rect.y, 0.0))
+        out.append((name, shape, rgb, visible, transparency))
+    return out
+
+
+def place_alt_stand(parts):
+    """Position the folded alt stand into the box's alt-stand bay, lying flat on the floor.
+
+    ``alt_stand.build_all`` offsets its parts beside the tray for standalone review; this
+    undoes that offset and shifts the folded stand (whose native ``Y`` starts at
+    ``-ALT_SHELF_BELOW_LIP``) into ``bottom_regions()['alt_bay']``.
+
+    Parameters
+    ----------
+    parts : list of tuple
+        The ``(name, shape, rgb, visible, transparency)`` tuples from ``alt_stand.build_all``.
+
+    Returns
+    -------
+    list of tuple
+        The parts translated into the box frame.
+    """
+    import alt_stand as a
+
+    rect = bl.bottom_regions()["alt_bay"]
+    dx = rect.x - a.DISPLAY_X_OFFSET
+    dy = rect.y + cfg.ALT_SHELF_BELOW_LIP
+    out = []
+    for name, shape, rgb, visible, transparency in parts:
+        shape.translate(Vector(dx, dy, 0.0))
+        out.append((name, shape, rgb, visible, transparency))
+    return out
 
 
 def build_all():
