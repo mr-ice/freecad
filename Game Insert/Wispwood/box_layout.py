@@ -77,8 +77,8 @@ def top_regions():
         and are not placed here.
     """
     c = cfg.COMPONENT_CLEARANCE
-    pocket_w = cfg.BOARD_CENTER_PTP + 5.0  # widest piece + slack
-    pocket_h = cfg.BOARD_PERIM_L + 5.0  # longest piece + slack
+    pocket_w = cfg.BOARD_CENTER_PTP + cfg.BOARD_POCKET_SLACK  # widest piece + slack
+    pocket_h = cfg.BOARD_PERIM_L + cfg.BOARD_POCKET_SLACK  # longest piece + slack
     board_pocket = Rect(0.0, 0.0, pocket_w, pocket_h)
 
     trough_w = cfg.BOX_W - board_pocket.w
@@ -89,12 +89,24 @@ def top_regions():
 
 
 def rect_in_box(r):
-    """Return True if rectangle ``r`` lies wholly within the box footprint."""
+    """Return True if rectangle ``r`` lies wholly within the box footprint.
+
+    Returns
+    -------
+    bool
+        ``True`` when all four sides of ``r`` are inside the box (0..BOX_W × 0..BOX_L).
+    """
     return r.x >= 0 and r.y >= 0 and r.x + r.w <= cfg.BOX_W and r.y + r.h <= cfg.BOX_L
 
 
 def rects_disjoint(a, b):
-    """Return True if rectangles ``a`` and ``b`` do not overlap in plan."""
+    """Return True if rectangles ``a`` and ``b`` do not overlap in plan.
+
+    Returns
+    -------
+    bool
+        ``True`` when ``a`` and ``b`` share no interior area (touching edges are allowed).
+    """
     return a.x + a.w <= b.x or b.x + b.w <= a.x or a.y + a.h <= b.y or b.y + b.h <= a.y
 
 

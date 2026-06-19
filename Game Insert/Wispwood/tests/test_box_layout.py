@@ -50,3 +50,21 @@ def test_vertical_budget_under_box_height():
 def test_folded_alt_within_bound():
     """Assert the folded alt-stand height fits under the top tray."""
     assert bl.folded_alt_within_bound()
+
+
+def _within(inner, outer):
+    """Return True if rect ``inner`` lies wholly within rect ``outer``."""
+    return (
+        inner.x >= outer.x
+        and inner.y >= outer.y
+        and inner.x + inner.w <= outer.x + outer.w
+        and inner.y + inner.h <= outer.y + outer.h
+    )
+
+
+def test_wells_inside_small_tray():
+    """Each component well is contained within the small-tray footprint."""
+    b = bl.bottom_regions()
+    tray = b["small_tray"]
+    for key in ("well_card", "well_cats", "well_round"):
+        assert _within(b[key], tray), f"{key} {b[key]} not inside small_tray {tray}"

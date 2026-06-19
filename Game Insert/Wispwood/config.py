@@ -228,6 +228,7 @@ BOOKLET_H = 244.0
 BOOKLET_THICKNESS = 1.0
 
 # Insert tray construction.
+BOARD_POCKET_SLACK = 5.0  # loose slack around the board-piece stack in the top-tray pocket
 INSERT_WALL = 2.0  # well/divider wall thickness
 INSERT_FLOOR = 1.5  # tray floor thickness
 TOP_TRAY_DEPTH = 12.0  # top-tray height (board stack is the tallest content)
