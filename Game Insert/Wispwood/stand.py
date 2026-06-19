@@ -69,6 +69,10 @@ FG_XS = (_OFFSET + _PC_L, _OFFSET + _PC_R)
 # Shared-thickness (47/47) split planes for overlapping folded parts.
 SPLIT_LOW = (T - cfg.ALT_SPLIT_GAP) / 2.0
 SPLIT_HIGH = SPLIT_LOW + cfg.ALT_SPLIT_GAP
+# Where the prop leg crosses over the base crossmember, use a dedicated (larger) gap so the
+# leg's underside does not fuse to the base: base keeps the lower band, leg keeps the upper.
+LEG_SPLIT_LOW = (T - cfg.ALT_LEG_GAP) / 2.0
+LEG_SPLIT_HIGH = LEG_SPLIT_LOW + cfg.ALT_LEG_GAP
 
 # Deployed triangle (centrelines): bottom hinge A, leg hinge H at distance S = D_LEG up the
 # shelf, cradle C at distance B along the base; angle at A is the deploy angle. By the law of
@@ -239,12 +243,13 @@ def build_base():
     cross = _box(NECK_XS[0], BASE_CROSS_Y - CROSS_W / 2.0, 0.0, NECK_XS[1] - NECK_XS[0], CROSS_W, T)
     base = base.fuse(cross)
 
-    # 47/47: the leg rests over the base crossmember (base keeps the lower in the prop-leg band).
+    # 47/47: the leg rests over the base crossmember, so the base keeps only the lower band
+    # (Z[0, LEG_SPLIT_LOW]) in the prop-leg band, leaving ALT_LEG_GAP below the leg.
     base = base.cut(
         _box(
             LEG_CX - LEG_W / 2.0 - 1.0,
             BASE_CROSS_Y - CROSS_W / 2.0 - 1.0,
-            SPLIT_HIGH,
+            LEG_SPLIT_LOW,
             LEG_W + 2.0,
             CROSS_W + 2.0,
             T,
@@ -271,7 +276,8 @@ def build_leg():
     leg = leg.cut(_xcyl(BORE, LEG_W + 2.0, x0 - 1.0, CROSS_Y, ZC))  # pin hole through both
     leg = leg.fuse(_xcyl(ROD_R, BASE_X1 - BASE_X0, BASE_X0, tip_y, ZC))  # base-width end cylinder
 
-    # 47/47: keep only the upper part where the leg rests over the base crossmember.
+    # 47/47: keep only the upper band (Z[LEG_SPLIT_HIGH, T]) where the leg rests over the base
+    # crossmember, so the leg underside leaves ALT_LEG_GAP above the base and does not fuse.
     leg = leg.cut(
         _box(
             x0 - 1.0,
@@ -279,7 +285,7 @@ def build_leg():
             -1.0,
             LEG_W + 2.0,
             CROSS_W + 2.0,
-            SPLIT_LOW + 1.0,
+            LEG_SPLIT_HIGH + 1.0,
         )
     )
     return _flat(leg)
