@@ -232,6 +232,7 @@ BOARD_POCKET_SLACK = 5.0  # loose slack around the board-piece stack in the top-
 INSERT_WALL = 2.0  # well/divider wall thickness
 INSERT_FLOOR = 1.5  # tray floor thickness
 TOP_TRAY_DEPTH = 12.0  # top-tray height (board stack is the tallest content)
+FINGER_SCOOP_R = 12.0  # radius of the finger-access scoop notches in the trays
 SMALL_TRAY_RIM_Z = 42.0  # bottom-tray rim, matched to the Wispwood tray top
 COMPONENT_CLEARANCE = GENERAL_CLEARANCE  # per-side fit clearance for component wells
 

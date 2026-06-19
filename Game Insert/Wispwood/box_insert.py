@@ -36,7 +36,7 @@ def build_small_tray():
 
     The tray outer walls rise to ``SMALL_TRAY_RIM_Z`` so the top tray rests flat across it
     and the Wispwood tray. Wells are cut to each component's depth; a finger scoop notches
-    the card and round wells for access.
+    the card well for access.
 
     Returns
     -------
@@ -69,10 +69,9 @@ def build_small_tray():
     )
 
     # Finger scoop on the card well (a half-cylinder notch in the near wall).
-    scoop_r = 12.0
     block = block.cut(
         Part.makeCylinder(
-            scoop_r, card.w, Vector(card.x, card.y + card.h / 2.0, rim), Vector(1, 0, 0)
+            cfg.FINGER_SCOOP_R, card.w, Vector(card.x, card.y + card.h / 2.0, rim), Vector(1, 0, 0)
         )
     )
     _assert_within_bed(block, "SmallTray")
@@ -114,7 +113,10 @@ def build_top_tray():
     p = t["board_pocket"]
     block = block.cut(
         Part.makeCylinder(
-            12.0, p.w, Vector(p.x + p.w / 2.0, p.y + cfg.INSERT_WALL, depth), Vector(0, -1, 0)
+            cfg.FINGER_SCOOP_R,
+            p.w,
+            Vector(p.x + p.w / 2.0, p.y + cfg.INSERT_WALL, depth),
+            Vector(0, -1, 0),
         )
     )
     _assert_within_bed(block, "TopTray")
@@ -149,5 +151,5 @@ def build_all():
     return [
         ("SmallTray", build_small_tray(), (0.85, 0.75, 0.45), True, 0),
         ("TopTray", top, (0.45, 0.65, 0.85), True, 40),
-        ("BoxReference", build_box_reference(), (0.6, 0.6, 0.6), True, 80),
+        ("BoxReference", build_box_reference(), (0.6, 0.6, 0.6), False, 80),
     ]
