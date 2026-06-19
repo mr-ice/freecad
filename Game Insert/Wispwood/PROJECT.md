@@ -93,6 +93,33 @@ Measured from `gepesso/wispwood-tile-holder/*.stl` (binary STL bounding boxes + 
   — one detent radius past `STAND_LOCK` (the arm's centreline end) so the peg sits at the
   rounded top of the slot. Do not export it.
 
+### Box insert — `box_insert.py`, `box_layout.py`, `derived.py`, `layout_svg.py`
+The retail box (185 × 265 × 65 mm interior) holds the Wispwood tray plus the rest of the game
+components. A two-layer packing keeps the chunky pieces below and the flat cardboard on top:
+
+**Bottom layer (floor → z = 42 mm):**
+- The **Wispwood tray** (86 × 183 mm, long axis along X) occupies the front-left bay.
+- A **folded alt-stand bay** (left of the tray in Y) stores the triangular stand flat.
+- A **small printed tray** fills the remaining bay with:
+  - **Cats on edge** — 6 cat tokens (double tile thickness, 35 × 35 face) stored on edge in a
+    full-height slot so the 35 mm faces stand vertical.
+  - **Card well** — unsleeved card deck (63 × 88 mm) in a recess with a finger-scoop notch.
+  - **Round-token well** — 8 round tokens (Ø34 mm) in a cylindrical well.
+
+**Top layer (z = 42 → ~54 mm):**
+- A **printed top tray** (full box footprint, `TOP_TRAY_DEPTH` = 12 mm) with three pockets:
+  - **Board pocket** — holds the 5 loose board pieces (widest piece `BOARD_CENTER_PTP` = 135 mm,
+    longest `BOARD_PERIM_L` = 190 mm); a finger scoop aids extraction.
+  - **Marker trough** — 4 flat marker standees (214 mm tall, stored along Y).
+  - **Paw recess** — 1st-player paw token (70 × 64 mm).
+- **Score pad + rules booklet** lie loose on top of the top tray; no pocket needed.
+
+**Bed size:** the trays are checked against `MAX_PRINTER_DIMENSION = 350` mm (XL bed required)
+at build time via `_assert_within_bed`.
+
+**Layout map:** `box-layout.svg` is generated from config by `layout_svg.py` and shows
+every component rectangle in the box frame at scale; re-run whenever dimensions change.
+
 ### Alternate stand (separate, triangular frame) — `alt_stand.py`
 The integrated stand is too big to fit in the box on the tray, so this is a **standalone**
 stand stored off the tray. It is a **triangular frame** of three parts — the **shelf** (holds
@@ -131,8 +158,14 @@ at a time.
   0.4 mm): where a leg crosses the lip-band cross it keeps the back ~47% and the shelf keeps the
   front (cross-lip support); where the crossbar passes under the prop leg it takes the back ~47%
   and the prop leg the front. Shown as `AltBase`. The **upright lock** (T ↔ base) is next.
-- **Current model:** the **shelf** part, shown beside the tray (`SHOW_ALT_STAND`), fully
-  parametric (`ALT_SHELF_*`).
+- **Upright lock:** when the triangle is deployed, the prop-leg's **T tongue** (a stub under
+  the T crossbar centre, width = `ALT_LOCK_NOTCH_W` − clearance) drops into a matching
+  **notch in the base crossbar** (`ALT_LOCK_NOTCH_W` × `ALT_LOCK_NOTCH_DEPTH`), fixing the
+  deployed angle. The 47/47 split at the crossbar/leg overlap keeps both parts print-free. Lock
+  geometry is first-pass; print tuning expected.
+- **Folded envelope:** `ALT_STAND_MAX_FOLDED_H = 40` mm constrains the folded stand height so
+  it clears under the top tray (which rests at z = 42 mm with a 2 mm margin). Checked at build
+  time; current computed folded height (`ALT_FOLDED_H`) is well within the bound.
 
 ### Finger-scoop chamfers
 - The scoops' **outer-face and top edges** are chamfered (`SCOOP_CHAMFER`) for finger
@@ -172,5 +205,8 @@ at a time.
 - [x] Alternate stand (restart): triangular frame — shelf (lips, corner cups, below-lip ext)
 - [x] Alternate stand: leg part (print-in-place hinge above lip + flattened-cylinder T end)
 - [x] Alternate stand: base part (two legs on a bottom-edge hinge, flanking the leg)
-- [ ] Alternate stand: the upright lock (T ↔ base legs) + verify the print-in-place hinges
+- [x] Alternate stand: upright lock (T tongue + base-crossbar notch) — first pass, needs print tuning
+- [x] Box insert: config + pure layout/validators + SVG map (box_layout, layout_svg, derived)
+- [x] Box insert: small tray (cats on edge, card, round-token wells) + printed top tray
+- [ ] Print + verify: trays fit the box, alt-stand lock seats, folded stand ≤ 40 mm
 - [ ] Alternate stand: confirm dims against a print
