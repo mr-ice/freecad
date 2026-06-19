@@ -113,7 +113,9 @@ def build_top_tray():
     t = bl.top_regions()
     depth = cfg.TOP_TRAY_DEPTH
     floor = cfg.INSERT_FLOOR
-    block = _box(0.0, 0.0, 0.0, cfg.BOX_W, cfg.BOX_L, depth)
+    # Oversize the plate by TOP_TRAY_FIT per side so it friction-fits and reaches the box ends.
+    fit = cfg.TOP_TRAY_FIT
+    block = _box(-fit, -fit, 0.0, cfg.BOX_W + 2 * fit, cfg.BOX_L + 2 * fit, depth)
 
     for key in ("board_pocket", "marker_trough"):
         r = t[key]

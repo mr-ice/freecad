@@ -254,8 +254,46 @@ def _chamfer_scoop_edges(tray):
         return tray
 
 
+def _diag_slot(yc, zc, x0, depth, length, width, angle_deg):
+    """Return a diagonal stadium (round-ended) slot, extruded ``depth`` along ``+X``.
+
+    A capsule in the Y-Z plane: two end caps of diameter ``width`` separated along a line at
+    ``angle_deg`` above horizontal and centred on ``(yc, zc)``, swept ``depth`` through the
+    wall. Used to lighten and add grip to the long side walls.
+
+    Parameters
+    ----------
+    yc, zc : float
+        Slot centre in the Y-Z plane (mm).
+    x0 : float
+        Start X of the through-cut (mm).
+    depth : float
+        Cut distance along ``+X`` (mm).
+    length, width : float
+        Stadium overall length (along the diagonal) and width (across) (mm).
+    angle_deg : float
+        Tilt of the slot above horizontal (deg).
+
+    Returns
+    -------
+    Part.Shape
+        The slot cutter solid.
+    """
+    cap = length - width  # cap-centre separation so the overall length includes the caps
+    a = math.radians(angle_deg)
+    dy, dz = math.cos(a), math.sin(a)
+    c1 = Vector(x0, yc - dy * cap / 2.0, zc - dz * cap / 2.0)
+    c2 = Vector(x0, yc + dy * cap / 2.0, zc + dz * cap / 2.0)
+    slot = Part.makeCylinder(width / 2.0, depth, c1, Vector(1.0, 0.0, 0.0))
+    slot = slot.fuse(Part.makeCylinder(width / 2.0, depth, c2, Vector(1.0, 0.0, 0.0)))
+    bar = Part.makeBox(depth, cap, width, Vector(0.0, -cap / 2.0, -width / 2.0))
+    bar.rotate(Vector(0.0, 0.0, 0.0), Vector(1.0, 0.0, 0.0), angle_deg)
+    bar.translate(Vector(x0, yc, zc))
+    return slot.fuse(bar)
+
+
 def build_tray():
-    """Build the tray: floor, walls, end walls, divider, lid slot, scoops, stand V-slots.
+    """Build the tray: floor, walls, end walls, divider, lid slot, scoops, grip slots.
 
     Returns
     -------
@@ -301,10 +339,25 @@ def build_tray():
         tray = tray.cut(_finger_scoop(cx, POCKET_Y1))  # back wall
     tray = _chamfer_scoop_edges(tray)
 
-    # Blind V-slots for the folding stand, in the outer face of each long wall.
-    slot_depth = cfg.STAND_PEG_DEPTH + cfg.STAND_SLOT_CLEARANCE
-    tray = tray.cut(_stand_slot_cutter(0.0, slot_depth))  # left wall (outer face x=0)
-    tray = tray.cut(_stand_slot_cutter(OUTER_WIDTH - slot_depth, slot_depth))  # right wall
+    # Diagonal rounded grip/lightening slots cut through both long side walls, in the pocket
+    # zone below the lid rails, to save plastic and improve grip.
+    z_mid = (cfg.FLOOR_THICKNESS + RAIL_Z0) / 2.0
+    y0 = cfg.WALL_END + cfg.GRIP_SLOT_LENGTH / 2.0 + 2.0
+    y1 = OUTER_LENGTH - cfg.WALL_END - cfg.GRIP_SLOT_LENGTH / 2.0 - 2.0
+    for i in range(cfg.GRIP_SLOT_COUNT):
+        yc = y0 + (y1 - y0) * (i + 0.5) / cfg.GRIP_SLOT_COUNT
+        for x0 in (-1.0, INNER_X1 - 1.0):  # left and right long walls (through-cut, overcut)
+            tray = tray.cut(
+                _diag_slot(
+                    yc,
+                    z_mid,
+                    x0,
+                    cfg.WALL_LONG + 2.0,
+                    cfg.GRIP_SLOT_LENGTH,
+                    cfg.GRIP_SLOT_WIDTH,
+                    cfg.GRIP_SLOT_ANGLE,
+                )
+            )
 
     return tray
 
@@ -571,26 +624,14 @@ def build_all():
         ``transparency`` is a view-only percent (0 opaque .. 100 invisible). The tray and
         lids are made ``TRAY_LID_TRANSPARENCY`` so the tiles/fit show through; the rest are
         opaque. ``LidSlotCutter`` is the (hidden) tool used to cut the tray's lid slot,
-        exposed for inspection. When ``SHOW_STAND_DEPLOYED`` is set, a non-printing
-        ``StandDeployed`` ghost (the stand posed at the lock position) is appended for
-        visual comparison -- do not export it.
+        exposed for inspection. The integrated folding stand has been retired in favour of
+        the separate stand (see ``alt_stand``); its builders remain below but are unused.
     """
     tlt = cfg.TRAY_LID_TRANSPARENCY
     parts = [
         ("Tray", build_tray(), (0.80, 0.80, 0.82), True, tlt),
         ("LidLarge", build_large_lid(), (0.20, 0.45, 0.85), True, tlt),
         ("LidSmall", build_small_lid(), (0.25, 0.70, 0.40), True, tlt),
-        ("Stand", build_stand(), (0.90, 0.50, 0.15), True, 0),
         ("LidSlotCutter", build_lid_slot_cutter(), (0.90, 0.25, 0.25), False, 0),
     ]
-    if cfg.SHOW_STAND_DEPLOYED:
-        parts.append(
-            (
-                "StandDeployed",
-                build_stand_deployed(),
-                (0.15, 0.85, 0.85),
-                True,
-                cfg.STAND_DEPLOYED_TRANSPARENCY,
-            )
-        )
     return parts

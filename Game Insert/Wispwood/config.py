@@ -64,6 +64,13 @@ SCOOP_WIDTH = 24.0  # width of the thumb scoop (pocket is POCKET_WIDTH wide)
 SCOOP_DEPTH_FRACTION = 0.8  # scoop reaches ~80% of the pocket depth from the top down
 SCOOP_CHAMFER = 1.0  # chamfer on the scoop's outer-face and top edges (finger comfort)
 
+# --- Grip / lightening slots (long side walls) -------------------------------
+# Diagonal rounded (stadium) slots cut through each long wall to save plastic and give grip.
+GRIP_SLOT_COUNT = 4  # slots per long wall, spaced along the length
+GRIP_SLOT_WIDTH = 6.0  # stadium width (across the slot)
+GRIP_SLOT_LENGTH = 22.0  # stadium length end-to-end (along the diagonal)
+GRIP_SLOT_ANGLE = 60.0  # slot tilt above horizontal (deg)
+
 # --- Folding stand -----------------------------------------------------------
 # Two legs (rounded free ends) joined by a front base panel a little wider than the box
 # front so it covers the legs; the leg/base junction is chamfered. Each leg carries a
@@ -234,6 +241,7 @@ BOARD_POCKET_SLACK = 5.0  # loose slack around the board-piece stack in the top-
 INSERT_WALL = 2.0  # well/divider wall thickness
 INSERT_FLOOR = 1.5  # tray floor thickness
 TOP_TRAY_DEPTH = 12.0  # top-tray height (board stack is the tallest content)
+TOP_TRAY_FIT = 0.4  # per-side oversize of the top tray so it friction-fits and covers the box ends
 FINGER_GROOVE_R = 8.0  # radius of the vertical finger grooves cut through the small-tray well walls
 SMALL_TRAY_RIM_Z = (
     FLOOR_THICKNESS + POCKET_DEPTH + LID_THICKNESS + LID_SLIDE_CLEARANCE + LID_TOP_LIP
