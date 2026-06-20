@@ -292,6 +292,44 @@ def _diag_slot(yc, zc, x0, depth, length, width, angle_deg):
     return slot.fuse(bar)
 
 
+def _stand_divot(dy, dz):
+    """Return a cutter for one stand-peg divot in the tray's max-X long wall (enters ``-X``).
+
+    A lofted negative of the stand locating peg (matching dimensions grown by
+    ``ALT_PEG_CLEAR``): narrow in Y, tapering in Z, mouth at the ``X = OUTER_WIDTH`` face and
+    narrowing inward, so the tray snaps onto the peg.
+
+    Parameters
+    ----------
+    dy, dz : float
+        Divot centre on the wall (Y along the tray length, Z up the wall).
+
+    Returns
+    -------
+    Part.Shape
+        The divot cutter solid.
+    """
+    clr = cfg.ALT_PEG_CLEAR
+    yw = cfg.ALT_LIP_PEG_W / 2.0 + clr  # narrow half-width in Y
+    zb = cfg.ALT_LIP_PEG_R + clr  # mouth half-height in Z
+    zt = cfg.ALT_LIP_PEG_TOP_R + clr  # tip half-height in Z
+    dep = cfg.ALT_LIP_PEG_H
+
+    def _rect(x, zh):
+        pts = [
+            Vector(x, dy - yw, dz - zh),
+            Vector(x, dy + yw, dz - zh),
+            Vector(x, dy + yw, dz + zh),
+            Vector(x, dy - yw, dz + zh),
+        ]
+        pts.append(pts[0])
+        return Part.makePolygon(pts)
+
+    mouth = _rect(OUTER_WIDTH + 0.5, zb)  # slightly proud of the wall face
+    tip = _rect(OUTER_WIDTH - dep, zt)  # deepest point inside the wall
+    return Part.makeLoft([mouth, tip], True)
+
+
 def build_tray():
     """Build the tray: floor, walls, end walls, divider, lid slot, scoops, grip slots.
 
@@ -358,6 +396,10 @@ def build_tray():
                     cfg.GRIP_SLOT_ANGLE,
                 )
             )
+
+    # Stand-peg divots in the max-X long wall, so the tray snaps onto the stand's locating pegs.
+    for dy in cfg.ALT_DIVOT_YS:
+        tray = tray.cut(_stand_divot(dy, cfg.ALT_DIVOT_Z))
 
     return tray
 

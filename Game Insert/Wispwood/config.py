@@ -152,8 +152,11 @@ ALT_LIP_PEG_W = 3.0  # locating-peg width in X (narrow, with perpendicular/verti
 ALT_LIP_PEG_R = 3.0  # locating-peg base half-height in Z (tapers in Z to the tip)
 ALT_LIP_PEG_TOP_R = 1.2  # locating-peg tip half-height in Z
 ALT_LIP_PEG_H = 3.0  # locating-peg protrusion (+Y)
-ALT_PEG_INSET = 6.0  # peg inset from each shelf edge (pegs near min/max X, near the top)
+ALT_PEG_INSET = 3.0  # peg inset from each shelf edge (pegs near min/max X, near the top)
 ALT_PEG_CLEAR = 0.3  # divot oversize over the peg
+# Matching divots in the tray's max-X long wall (the tray snaps onto the stand pegs there).
+ALT_DIVOT_YS = (6.0, 86.0)  # divot positions along the tray length (Y) on the X = OUTER_WIDTH face
+ALT_DIVOT_Z = 20.0  # divot height up the tray wall (Z)
 
 SHOW_ALT_STAND = True
 ALT_SHELF_THICKNESS = 7.0  # shelf plate thickness (the leg nests fully inside this, not the lips)
