@@ -204,17 +204,19 @@ def _tray_lip():
     down = cfg.ALT_LIP_DOWN
 
     lip = _box(ROD_R, ly, T, W - 2 * ROD_R, lt, h_low)  # low lip across the whole width
-    rg = ROD_R - 1.0  # gusset fillet radius = crossmember material behind the lip (stays supported)
+    gw = cfg.ALT_LIP_GUSSET_W
+    gr = cfg.ALT_LIP_GUSSET_R
     for edge_x, fg in ((0.0, FG_XS[0]), (W, FG_XS[1])):
         x_lo, x_hi = min(edge_x, fg), max(edge_x, fg)
         post = _box(x_lo, ly, T - down, x_hi - x_lo, lt, h_edge + down)  # extends down to the frame
         post = post.cut(_ycyl(r_f, lt + 2.0, fg, ly - 1.0, T + h_edge))  # fillet down to fg
         lip = lip.fuse(post)
-        # Filleted gusset on the back (-Y) face of the post, sitting on the crossmember, bracing
-        # the tall post against bending. A quarter-round concave fillet; the shelf frame is
-        # untouched (the gusset only sits on the Z = T surface over the crossmember).
-        gbox = _box(x_lo, ly - rg, T, x_hi - x_lo, rg, rg)
-        gcut = _xcyl(rg, (x_hi - x_lo) + 2.0, x_lo - 1.0, ly - rg, T + rg)
+        # Filleted gusset bracing the tall post: a narrow quarter-round on the back (-Y) face,
+        # centred on the shelf's outer side rail (which supports it) and tall/deep via the fillet
+        # radius. The shelf frame is untouched (the gusset only adds material above Z = T).
+        gx = ROD_R if edge_x < W / 2.0 else W - ROD_R  # centre on the outer side rail
+        gbox = _box(gx - gw / 2.0, ly - gr, T, gw, gr, gr)
+        gcut = _xcyl(gr, gw + 2.0, gx - gw / 2.0 - 1.0, ly - gr, T + gr)
         lip = lip.fuse(gbox.cut(gcut))
 
     # Clearance so the lip does not fuse to the leg hinge passing under it: a narrow flat span
