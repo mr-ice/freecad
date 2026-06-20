@@ -62,36 +62,11 @@ Measured from `gepesso/wispwood-tile-holder/*.stl` (binary STL bounding boxes + 
 ### Finger scoops
 - On **both short ends** (front and back walls), one per pocket, **~80% of the pocket
   depth** (`SCOOP_DEPTH_FRACTION`) for easy tile access from either end.
-- **Not on the long sides** — that area is reserved for the folding stand.
+- **Not on the long sides** — that area is reserved for the diagonal grip/lightening slots.
 
-### Folding stand
-- Two **legs** (length = `STAND_LEG_LENGTH_FRAC` × tray length, currently **0.6**) with
-  **rounded free ends**, centred
-  vertically on the box, joined by a **front base panel** made **a little wider than the
-  box front so it covers the legs**, with **chamfered gussets** at the leg/base junctions.
-- Each leg carries a **substantial oval peg** (`STAND_PEG_LENGTH`×`STAND_PEG_WIDTH`) at the
-  **back of the leg, equal top/bottom/back margins**, riding a slot in the wall's outer
-  face (blind — does not breach the pocket).
-- Slot path (hinge toward the **front**, constant-width channels, **no keyhole**):
-  - **parallel arm** — horizontal, the folded peg rest, length `STAND_SLOT_ARM_LEN`;
-  - **jog** — a short vertical lift of `STAND_JOG_FRAC` × peg width (≈50%) at the vertex;
-  - **top arm** — short tilted lock arm, `STAND_ARM2_FRAC` × peg length (≈150%), at
-    `STAND_V_ANGLE_DEG`. The jog + short arm form the lock detent.
-- Slot position **derived from the leg** (margins stay equal). Modelled **folded** —
-  kinematics still to be tuned against a print.
-- **Anti-fuse gap:** each leg's inner face is offset from the tray's outer wall by
-  `STAND_BODY_GAP` (0.2 mm) so the folded-modelled legs do not print fused to the tray
-  body; the oval pegs are lengthened to bridge the gap and still seat fully in the slot.
-- **Balance knob:** `STAND_LEG_LENGTH_FRAC` is the single parameter for the deployed
-  balance — longer legs move the centre of gravity **up and back**. The entire slot path is
-  derived from the leg length, so the leg and slot move together and stay aligned (the
-  peg's back margin is constant); it stays in-bounds through ~0.7.
-- **Deployed ghost (display-only):** with `SHOW_STAND_DEPLOYED`, a **non-printing**
-  `StandDeployed` copy is shown at the lock (second) position for visual comparison. Because
-  the oval peg's major axis follows the slot-channel direction, the lock pose is the stand
-  rotated by `STAND_V_ANGLE_DEG` about the peg axis and carried to the seated lock position
-  — one detent radius past `STAND_LOCK` (the arm's centreline end) so the peg sits at the
-  rounded top of the slot. Do not export it.
+> The original **integrated folding stand** (oval pegs riding V-slots in the tray walls) is
+> **retired**; it lives in `archive/folding_stand.py`. The tray is now held by the separate
+> rod-frame **display stand** (`stand.py`), described below.
 
 ### Box insert — `box_insert.py`, `box_layout.py`, `derived.py`, `layout_svg.py`
 The retail box (185 × 265 × 65 mm interior) holds the Wispwood tray plus the rest of the game
@@ -119,52 +94,43 @@ at build time via `_assert_within_bed`.
 **Layout map:** `box-layout.svg` is generated from config by `layout_svg.py` and shows
 every component rectangle in the box frame at scale; re-run whenever dimensions change.
 
-### Alternate stand (separate, triangular frame) — `alt_stand.py`
-The integrated stand is too big to fit in the box on the tray, so this is a **standalone**
-stand stored off the tray. It is a **triangular frame** of three parts — the **shelf** (holds
-the tray), the **base** (on the table), and the **leg** (props them apart) — built up one part
-at a time.
-- **Shelf:** a **rounded-rectangle** plate, `ALT_SHELF_THICKNESS` (2 mm) thick,
-  `ALT_SHELF_WIDTH_OVER_TRAY` (3 mm) wider than the tray, `ALT_SHELF_HEIGHT` (~80 mm) tall. On
-  the top surface: a **cross-lip** across the bottom that the tray rests against, and two
-  **side lips** above it on the outer edges (`ALT_SHELF_SIDE_LIP_W` 1.4 mm × `…_H` 3 mm) that
-  steady the tray — their inner gap clears the 86 mm tray by 0.1 mm/side. The two bottom
-  **corners are raised** to `ALT_SHELF_CORNER_H_FRAC` (~½ the tray height, ≈21 mm) and
-  **filleted** (r ≈ 18 mm) back down to the cross-lip and side-lips, making a deeper cup that
-  cradles the tray's bottom corners. The unused centre — of both the tray region and the
-  below-lip extension — is cut out, leaving a **border frame** (`ALT_SHELF_BORDER`).
-- **Below-lip extension:** the frame extends `ALT_SHELF_BELOW_LIP` (~15 mm, slant) below the
-  lip toward the base. Deployed at 15° off vertical that lifts the top of the lip ~17 mm so
-  the tray's front-top edge lands ~28 mm off the table (`front_edge = lip_vert + H_tray·sin15`).
-- **Stocky frame:** plate `ALT_SHELF_THICKNESS` 4 mm, border `ALT_SHELF_BORDER` 10 mm; side
-  lips widened to 3 mm (matched to the cross-lip), so the shelf width is now derived as
-  tray + 2 side lips + 2 `ALT_SHELF_SIDE_CLEAR` = 92.2 mm (86.2 mm inner gap for the tray).
-- **Stocky base:** plate `ALT_SHELF_THICKNESS` now **7 mm** (not counting lips), so the leg
-  nests fully inside it.
-- **Leg (`build_leg`):** a prop bar that nests **fully inside the 7 mm** plate's central
-  opening (recessed, free of all structure) and joins the plate by a **print-in-place hinge**
-  just above the cross-lip — interleaved knuckles (`ALT_HINGE_SEGMENTS`, plate at the ends) on
-  a single pin. The knuckle body is **Ø7 mm** (`ALT_HINGE_R`, fills the full plate thickness)
-  on a **Ø3 mm** pin (`ALT_HINGE_PIN_R`, part of the plate); leg knuckles bored
-  `ALT_HINGE_PIN_CLEAR` (0.4 mm) over it → ~1.6 mm walls, with `ALT_HINGE_AXIAL_CLEAR` between
-  knuckles — all gaps are the print clearances that keep it free. The far end is a **flattened cylinder forming a T** (`ALT_LEG_T_*`) for
-  locking upright. Shown as `AltLeg`.
-- **Base (`build_base`):** the foot — **two legs** on print-in-place hinges **centred in the
-  shelf's bottom border** (knuckles subdivided to match the prop-leg hinge width), running up
-  through the shelf flanking the prop leg (`ALT_BASE_LEG_WIDTH`, `ALT_BASE_LEG_CLEAR`),
-  **stopping short of the T** (`ALT_BASE_T_GAP`), joined by a **high crossbar**
-  (`ALT_BASE_CROSS_INSET` below the leg tops). **Shared-thickness (~47/47) cuts** (`ALT_SPLIT_GAP`
-  0.4 mm): where a leg crosses the lip-band cross it keeps the back ~47% and the shelf keeps the
-  front (cross-lip support); where the crossbar passes under the prop leg it takes the back ~47%
-  and the prop leg the front. Shown as `AltBase`. The **upright lock** (T ↔ base) is next.
-- **Upright lock:** when the triangle is deployed, the prop-leg's **T tongue** (a stub under
-  the T crossbar centre, width = `ALT_LOCK_NOTCH_W` − clearance) drops into a matching
-  **notch in the base crossbar** (`ALT_LOCK_NOTCH_W` × `ALT_LOCK_NOTCH_DEPTH`), fixing the
-  deployed angle. The 47/47 split at the crossbar/leg overlap keeps both parts print-free. Lock
-  geometry is first-pass; print tuning expected.
-- **Folded envelope:** `ALT_STAND_MAX_FOLDED_H = 40` mm constrains the folded stand height so
-  it clears under the top tray (which rests at z = 42 mm with a 2 mm margin). Checked at build
-  time; current computed folded height (`ALT_FOLDED_H`) is well within the bound.
+### Display stand (tabletop base) — `stand.py`
+A **standalone** rod-frame stand, stored folded off the tray, that holds the tray upright at
+`STAND_DEPLOY_ANGLE` (75°) with its bottom (dispensing) edge lifted `TRAY_LIFT` (25 mm) above
+the table. Three flat **print-in-place** parts (Ø9 rod flattened to `ALT_PART_T` = 7 mm in Z so
+they print flat-bed). The FreeCAD-free **kinematics and stability live in `derived.py`**;
+`stand.py` builds the geometry; `tests/test_derived.py` pins the math.
+
+**Why this shape:** the tray is a 183 mm-long, 43 mm-thick slab. Stood near-vertical, its CG
+crosses its bottom edge as tiles pile low, so it tips **forward**, not back. The fix is a wide
+flat base that reaches **forward of the hinge** and is the sole table contact (see
+`stand-design.svg` / `stand-options.svg`).
+
+- **Shelf (`build_shelf`):** a continuous **rounded rod rectangle** (straight runs + quarter-
+  torus corners). The bottom rod necks to **pins** at `NECK_XS` for the base hinge; a
+  crossmember rod (at the derived `ALT_CROSS_Y`, set by `TRAY_LIFT`) necks for the leg hinge
+  and carries the **tray lip** — deep at the shelf edges, filleted down to clear the finger
+  grooves, with **locating pegs** on the lip faces (`ALT_LIP_PEG_*`, `PEG_XS`) that seat in the
+  tray's front-face **divots**. *(Lip + side lips + pegs + tabs are unchanged — they work.)*
+- **Base (`build_base`):** a flat **open rod rectangle** lying on the table — the **sole
+  contact, so it cannot rock**. Side rails sit at `NECK_XS`; two bored **knuckles** at the
+  hinge axis interleave the shelf pins (print-in-place hinge along X). It reaches a **forward
+  foot** `ALT_BASE_FWD` (25 mm) ahead of the hinge — catching the loaded CG — and back to a
+  **snap cradle** (`_lock_cradle`, seat clearance `ALT_SNAP_CLEAR`) past the lock line.
+- **Leg (`build_leg`):** a bar continued onto its **bored hinge cylinder** (on the shelf
+  crossmember pin) plus a base-width **end cylinder** that snaps into the base cradle to lock
+  the angle. `ALT_LEG_LENGTH` sets the prop length (fits folded between the crossmember and the
+  shelf top).
+- **Computed lock:** the cradle distance `ALT_B_BASE` is solved by law of cosines from the
+  hinge spacing `ALT_S_HINGES`, leg length, and `ALT_CRADLE_OFFSET` so the deployed shelf sits
+  at exactly 75°.
+- **Stability guarantee:** `derived.stand_is_stable()` checks the loaded CG range (empty ≈ 9 mm
+  behind the hinge, tiles-low ≈ 10 mm forward) stays inside the footprint (forward foot at
+  −`ALT_BASE_FWD`, cradle at +`ALT_B_BASE`). `build_all` asserts it, so a bad parameter edit
+  fails the build instead of printing an unstable stand.
+- **Folded envelope:** `ALT_STAND_MAX_FOLDED_H = 40` mm bounds the folded height (`ALT_FOLDED_H`
+  ≈ 37.5 mm: base + shelf + upstanding lip). The forward foot protrudes past the shelf bottom
+  edge when folded (intentional). Checked at build time and in `tests/test_derived.py`.
 
 ### Finger-scoop chamfers
 - The scoops' **outer-face and top edges** are chamfered (`SCOOP_CHAMFER`) for finger
