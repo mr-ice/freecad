@@ -326,6 +326,15 @@ def build_base():
     # Print-in-place hinge knuckles at the axis (Y = HBY), between the foot and the frame.
     base = base.fuse(_base_knuckle(NECK_XS[0])).fuse(_base_knuckle(NECK_XS[1]))
 
+    # Solid pads (Z[0, T]) under each cradle: the cradle boss is wider than its rail, so it would
+    # overhang; the pad fills the base out to the rear rod there, fully supporting the boss and
+    # stiffening the rear corners. The pads sit on the rails, clear of the central prop leg.
+    pad_y0 = BASE_CROSS_Y - ROD_R
+    for nc in NECK_XS:
+        base = base.fuse(
+            _box(nc - BASE_KNUCKLE_W / 2.0, pad_y0, 0.0, BASE_KNUCKLE_W, BASE_BACK_Y - pad_y0, T)
+        )
+
     # 47/47 crossings (base keeps the LOWER band Z[0, SPLIT_LOW]):
     #  - base rails pass under the shelf crossmember (at NECK_XS, Y = CROSS_Y);
     #  - the rear-foot rod passes under the prop leg (centre, Y = yb).

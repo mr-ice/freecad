@@ -23,8 +23,11 @@ WALL_TOP = LID_Z1 + cfg.LID_SLIDE_CLEARANCE + cfg.LID_TOP_LIP  # outer wall top 
 
 # --- Stand kinematics (FreeCAD-free; consumed by stand.py) -------------------
 ALT_THETA = math.radians(cfg.STAND_DEPLOY_ANGLE)
-ALT_HBY = cfg.ALT_ROD_R  # bottom-rod (base hinge) axis Y
 ALT_ZC = cfg.ALT_PART_T / 2.0  # hinge axis height = part mid-plane (base rests on the table)
+# Bottom-rod (base hinge) axis Y = the Ø7 knuckle radius, so the round knuckle's front is FLUSH
+# with the shelf's outer (front) face at Y = 0; with the axis on the outer edge, no material
+# sits forward of it to swing below the table when the shelf tips up.
+ALT_HBY = cfg.ALT_PART_T / 2.0
 ALT_SHELF_W = OUTER_WIDTH + 2 * cfg.ALT_SHELF_SIDE_LIP_W + 2 * cfg.ALT_SHELF_SIDE_CLEAR  # ~92.2
 
 # Crossmember Y derived so the tray bottom edge lifts to TRAY_LIFT above the table.
