@@ -131,6 +131,29 @@ def _xz_prism(pts_xz, y0, dy):
     return Part.Face(Part.makePolygon(verts)).extrude(Vector(0.0, dy, 0.0))
 
 
+def _peg(px, pz, py):
+    """Return a pyramid locating peg protruding ``+Y`` from a lip face at ``(px, py, pz)``.
+
+    A truncated pyramid (square base on the face, smaller tip out along ``+Y``); its faces are
+    all angled, so the downward face self-supports when printed flat.
+    """
+    bw = cfg.ALT_LIP_PEG_R  # base half-extent
+    tw = cfg.ALT_LIP_PEG_TOP_R  # tip half-extent
+    dep = cfg.ALT_LIP_PEG_H  # +Y protrusion
+
+    def _rect(y, hw):
+        pts = [
+            Vector(px - hw, y, pz - hw),
+            Vector(px + hw, y, pz - hw),
+            Vector(px + hw, y, pz + hw),
+            Vector(px - hw, y, pz + hw),
+        ]
+        pts.append(pts[0])
+        return Part.makePolygon(pts)
+
+    return Part.makeLoft([_rect(py, bw), _rect(py + dep, tw)], True)
+
+
 def _corner(cx, cy, start_deg):
     """Return a quarter-torus frame fillet (path radius ``CR``, tube ``ROD_R``) at a corner."""
     elbow = Part.makeTorus(
@@ -195,18 +218,9 @@ def _tray_lip():
     )
     lip = lip.cut(cutter)
 
-    # Locating pegs on top of each edge post (cone: angled sides print well, self-centre in the
-    # matching tray divot).
+    # Pyramid locating pegs on the +Y face of each edge post (toward the tray), at mid-height.
     for px in PEG_XS:
-        lip = lip.fuse(
-            Part.makeCone(
-                cfg.ALT_LIP_PEG_R,
-                cfg.ALT_LIP_PEG_TOP_R,
-                cfg.ALT_LIP_PEG_H,
-                Vector(px, ly + lt / 2.0, T + h_edge),
-                Vector(0.0, 0.0, 1.0),
-            )
-        )
+        lip = lip.fuse(_peg(px, T + h_edge / 2.0, ly + lt))
     return lip
 
 
