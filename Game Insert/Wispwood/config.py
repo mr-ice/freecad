@@ -236,9 +236,12 @@ MARKER_H = 214.0
 MARKER_COUNT = 4
 MARKER_THICKNESS = STOCK_THICKNESS
 
-# Board: 5 loose pieces (assembled it is 268 across, larger than the box).
+# Board: 5 loose pieces (assembled it is 268 across, larger than the box). The 4 perimeter
+# pieces are a quarter of the octagonal ring between the center octagon and the outer octagon
+# (each centred on a corner, two full outer sides, cut at the adjacent corners).
 BOARD_CENTER_PTP = 135.0  # center octagon, point-to-point
-BOARD_PERIM_W = 86.0  # perimeter-piece bounding box (1/4 octagon)
+BOARD_ASSEMBLED_PTP = 268.0  # full assembled board (outer octagon), point-to-point
+BOARD_PERIM_W = 86.0  # perimeter-piece bounding box (1/4 octagon) -- measured, for reference
 BOARD_PERIM_L = 190.0
 BOARD_PIECE_COUNT = 5
 BOARD_THICKNESS = STOCK_THICKNESS

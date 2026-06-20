@@ -38,18 +38,55 @@ def _at_origin(shape):
     return shape
 
 
-def build_perimeter_map():
-    """Return one outer map section (1/4-octagon), as its measured bounding box.
+def _octagon_face(ptp):
+    """Return a regular-octagon face (point-to-point ``ptp``), centred at the origin in Z = 0.
 
-    The real pieces are puzzle-cut quarter-octagons; for layout/packing only the footprint
-    matters, so this is a ``BOARD_PERIM_W x BOARD_PERIM_L`` plate one stock thickness thick.
+    Vertices sit at 22.5 deg + k*45 deg, so the octagon has the usual flat top/bottom/sides.
+    """
+    r = ptp / 2.0  # circumradius (point-to-point = 2 r)
+    pts = [
+        Vector(
+            r * math.cos(math.radians(22.5 + 45 * k)),
+            r * math.sin(math.radians(22.5 + 45 * k)),
+            0.0,
+        )
+        for k in range(8)
+    ]
+    pts.append(pts[0])
+    return Part.Face(Part.makePolygon(pts))
+
+
+def build_perimeter_map():
+    """Return one outer map section: a 1/4 of the octagonal ring (centre octagon to outer octagon).
+
+    A 90 deg wedge of the ring between the center octagon (``BOARD_CENTER_PTP``) and the outer
+    octagon (``BOARD_ASSEMBLED_PTP``), centred on a corner and cut at the two adjacent corners.
+    This is the geometric quarter-octagon (no puzzle tabs) -- a base to refine from a photo/
+    measurements; the real piece may not fill its bounding box.
 
     Returns
     -------
     Part.Shape
         The board-section solid (bbox min at the origin).
     """
-    return _box(0.0, 0.0, 0.0, cfg.BOARD_PERIM_W, cfg.BOARD_PERIM_L, cfg.BOARD_THICKNESS)
+    thk = cfg.BOARD_THICKNESS
+    outer = _octagon_face(cfg.BOARD_ASSEMBLED_PTP).extrude(Vector(0.0, 0.0, thk))
+    inner = _octagon_face(cfg.BOARD_CENTER_PTP).extrude(Vector(0.0, 0.0, thk))
+    # 90 deg wedge centred on the vertex at 22.5 deg (cut lines through the adjacent vertices at
+    # -22.5 and 67.5 deg). A triangle to a far radius covers the sector (< 180 deg).
+    big = 3.0 * cfg.BOARD_ASSEMBLED_PTP
+    a0, a1 = math.radians(-22.5), math.radians(67.5)
+    wedge = Part.Face(
+        Part.makePolygon(
+            [
+                Vector(0.0, 0.0, 0.0),
+                Vector(big * math.cos(a0), big * math.sin(a0), 0.0),
+                Vector(big * math.cos(a1), big * math.sin(a1), 0.0),
+                Vector(0.0, 0.0, 0.0),
+            ]
+        )
+    ).extrude(Vector(0.0, 0.0, thk))
+    return _at_origin(outer.common(wedge).cut(inner))
 
 
 def build_center_map():
@@ -60,18 +97,9 @@ def build_center_map():
     Part.Shape
         The center-octagon solid (bbox min at the origin).
     """
-    r = cfg.BOARD_CENTER_PTP / 2.0  # circumradius (point-to-point = 2 r)
-    pts = [
-        Vector(
-            r * math.cos(math.radians(22.5 + 45 * k)),
-            r * math.sin(math.radians(22.5 + 45 * k)),
-            0.0,
-        )
-        for k in range(8)
-    ]
-    pts.append(pts[0])
-    face = Part.Face(Part.makePolygon(pts))
-    return _at_origin(face.extrude(Vector(0.0, 0.0, cfg.BOARD_THICKNESS)))
+    return _at_origin(
+        _octagon_face(cfg.BOARD_CENTER_PTP).extrude(Vector(0.0, 0.0, cfg.BOARD_THICKNESS))
+    )
 
 
 def build_cards():
