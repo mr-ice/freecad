@@ -99,7 +99,11 @@ ALT_SNAP_CLEAR = 0.15  # snap interference (smaller = stronger click)
 # end-cylinder clicks into the base.
 ALT_ROD_R = 4.5  # frame rod in-plane radius (Ø9), flattened to ALT_PART_T in Z for printing
 ALT_PART_T = 7.0  # part thickness in Z (a 7 mm cross-section trimmed from the Ø9 rod)
-ALT_CROSS_Y = 24.0  # shelf crossmember Y (tray sits here; the leg hinges on it)
+# The shelf crossmember Y (where the tray sits and the leg hinges) is DERIVED in derived.py
+# from TRAY_LIFT so the tray bottom edge lifts to a fixed height above the table.
+TRAY_LIFT = 25.0  # tray bottom (dispensing) edge height above the table, deployed (absolute)
+ALT_BASE_FWD = 25.0  # base forward-foot reach ahead of the shelf hinge (catches the loaded CG)
+ALT_CG_LOW_OFFSET = 20.0  # assumed CG height above the lip when tiles pile low (worst forward case)
 ALT_TRAY_LIP_H = 3.0  # lip height above the shelf face that catches the tray bottom edge
 ALT_BASE_FOOT = 12.0  # base length past the lock line (foot)
 ALT_BASE_CROSS_W = 9.0  # base/leg crossmember width along the part
