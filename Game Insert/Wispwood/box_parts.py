@@ -7,8 +7,10 @@ as a reference solid at its real size, laid out in a palette beside the box. It 
 organizer will be carved.
 
 Fungible multiples (solo tokens, cats, markers) are modelled as a single **stack** (the storage
-envelope) rather than separate pieces; the four outer map sections are separate objects. Sizes
-come from :mod:`config`; nothing here is a printed part — these are design references.
+envelope) rather than separate pieces; the four outer map sections are separate objects. The
+irregular parts (outer map sections, paw, ruler/markers) use **outlines traced from photos** on
+Letter paper (see ``tools/trace_parts.py``); the rest come from sizes in :mod:`config`. Nothing
+here is a printed part — these are design references.
 
 Public API
 ----------
@@ -56,37 +58,86 @@ def _octagon_face(ptp):
     return Part.Face(Part.makePolygon(pts))
 
 
-def build_perimeter_map():
-    """Return one outer map section: a 1/4 of the octagonal ring (centre octagon to outer octagon).
+def _profile_solid(points, thk):
+    """Extrude a closed 2-D outline (list of ``(x, y)`` mm) by ``thk`` in Z, bbox min at origin."""
+    pts = [Vector(x, y, 0.0) for x, y in points]
+    pts.append(pts[0])
+    return _at_origin(Part.Face(Part.makePolygon(pts)).extrude(Vector(0.0, 0.0, thk)))
 
-    A 90 deg wedge of the ring between the center octagon (``BOARD_CENTER_PTP``) and the outer
-    octagon (``BOARD_ASSEMBLED_PTP``), centred on a corner and cut at the two adjacent corners.
-    This is the geometric quarter-octagon (no puzzle tabs) -- a base to refine from a photo/
-    measurements; the real piece may not fill its bounding box.
+
+# --- Measured outlines (mm), traced from photos on Letter paper by tools/trace_parts.py ------
+# Each is a closed polygon with bbox minimum at the origin; the four outer map sections are
+# identical, so one profile is reused. Re-run the tracer to refresh these from new photos.
+_OUTER_MAP_PROFILE = [
+    (0.0, 49.5),
+    (13.0, 60.0),
+    (17.0, 54.0),
+    (37.8, 60.5),
+    (47.0, 75.0),
+    (42.8, 83.5),
+    (51.5, 90.2),
+    (96.2, 65.8),
+    (145.8, 79.5),
+    (153.0, 70.8),
+    (160.8, 75.0),
+    (176.5, 65.2),
+    (182.5, 51.2),
+    (182.0, 45.0),
+    (176.8, 40.8),
+    (186.2, 27.5),
+    (89.8, 0.0),
+]
+_PAW_PROFILE = [
+    (22.0, 1.2),
+    (17.2, 4.8),
+    (12.8, 13.5),
+    (4.5, 19.0),
+    (0.0, 28.8),
+    (2.0, 38.0),
+    (9.2, 46.5),
+    (11.5, 56.2),
+    (17.8, 63.0),
+    (25.5, 65.2),
+    (35.0, 64.0),
+    (46.2, 65.8),
+    (50.5, 64.5),
+    (56.8, 60.0),
+    (60.5, 53.5),
+    (61.2, 48.5),
+    (69.0, 40.2),
+    (71.2, 32.5),
+    (71.0, 27.5),
+    (67.5, 21.2),
+    (60.2, 16.2),
+    (57.5, 7.8),
+    (51.2, 1.8),
+    (46.2, 0.8),
+    (36.2, 3.0),
+    (29.5, 0.0),
+]
+_RULER_PROFILE = [
+    (0.0, 4.5),
+    (1.8, 14.8),
+    (17.0, 22.2),
+    (19.2, 34.5),
+    (195.8, 34.8),
+    (198.0, 21.5),
+    (210.2, 17.0),
+    (214.0, 11.2),
+    (213.0, 0.5),
+    (1.2, 0.0),
+]
+
+
+def build_perimeter_map():
+    """Return one outer map section, from the photo-traced quarter-octagon puzzle outline.
 
     Returns
     -------
     Part.Shape
-        The board-section solid (bbox min at the origin).
+        The board-section solid (bbox min at the origin), ~186 x 90 mm.
     """
-    thk = cfg.BOARD_THICKNESS
-    outer = _octagon_face(cfg.BOARD_ASSEMBLED_PTP).extrude(Vector(0.0, 0.0, thk))
-    inner = _octagon_face(cfg.BOARD_CENTER_PTP).extrude(Vector(0.0, 0.0, thk))
-    # 90 deg wedge centred on the vertex at 22.5 deg (cut lines through the adjacent vertices at
-    # -22.5 and 67.5 deg). A triangle to a far radius covers the sector (< 180 deg).
-    big = 3.0 * cfg.BOARD_ASSEMBLED_PTP
-    a0, a1 = math.radians(-22.5), math.radians(67.5)
-    wedge = Part.Face(
-        Part.makePolygon(
-            [
-                Vector(0.0, 0.0, 0.0),
-                Vector(big * math.cos(a0), big * math.sin(a0), 0.0),
-                Vector(big * math.cos(a1), big * math.sin(a1), 0.0),
-                Vector(0.0, 0.0, 0.0),
-            ]
-        )
-    ).extrude(Vector(0.0, 0.0, thk))
-    return _at_origin(outer.common(wedge).cut(inner))
+    return _profile_solid(_OUTER_MAP_PROFILE, cfg.BOARD_THICKNESS)
 
 
 def build_center_map():
@@ -108,8 +159,8 @@ def build_cards():
 
 
 def build_paw():
-    """Return the 1st-player paw token as its bounding-box plate."""
-    return _box(0.0, 0.0, 0.0, cfg.PAW_W, cfg.PAW_H, cfg.PAW_THICKNESS)
+    """Return the 1st-player paw token, from the photo-traced cat-paw outline (~71 x 66 mm)."""
+    return _profile_solid(_PAW_PROFILE, cfg.PAW_THICKNESS)
 
 
 def build_solo_tokens():
@@ -125,9 +176,12 @@ def build_cats():
 
 
 def build_markers():
-    """Return the 4 markers (solo board + rulers) as a single flat stack (34 x 214)."""
-    h = cfg.MARKER_COUNT * cfg.MARKER_THICKNESS
-    return _box(0.0, 0.0, 0.0, cfg.MARKER_W, cfg.MARKER_H, h)
+    """Return the 4 markers (rulers/solo board) as a stack, using the photo-traced ruler outline.
+
+    The markers are the ~214 x 35 mm number-track standees; modelled as one ruler profile
+    extruded to the 4-piece stack thickness (the storage envelope).
+    """
+    return _profile_solid(_RULER_PROFILE, cfg.MARKER_COUNT * cfg.MARKER_THICKNESS)
 
 
 def build_scorepad():
