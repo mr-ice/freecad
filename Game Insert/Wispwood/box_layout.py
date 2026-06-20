@@ -73,21 +73,22 @@ def top_regions():
     perimeter by ``INSERT_WALL`` and separated from its neighbour by ``INSERT_WALL``.
     The paw, score pad and booklet lie loose on top and are not placed here.
 
+    Both bays run the FULL interior length (Y) so the long bits (markers 214, score pad 218)
+    drop in with room to spare.
+
     Returns
     -------
     dict of str to Rect
-        ``board_pocket`` (loose stack of 5 board pieces) and ``marker_trough`` (4 markers,
-        214 along Y).
+        ``board_pocket`` (loose stack of 5 board pieces) and ``marker_trough`` (4 markers),
+        both spanning the full interior length.
     """
-    c = cfg.COMPONENT_CLEARANCE
     w = cfg.INSERT_WALL
+    full_h = cfg.BOX_L - 2 * w  # full interior length (both bays)
     board_w = cfg.BOARD_CENTER_PTP + cfg.BOARD_POCKET_SLACK  # widest piece + slack
-    board_h = cfg.BOARD_PERIM_L + cfg.BOARD_POCKET_SLACK  # longest piece + slack
-    board_pocket = Rect(w, w, board_w, board_h)
+    board_pocket = Rect(w, w, board_w, full_h)
     trough_x = board_pocket.x + board_pocket.w + w  # wall gap after the board pocket
     trough_w = cfg.BOX_W - w - trough_x  # remaining width inside the right wall
-    trough_h = cfg.MARKER_H + 2 * c  # 214 markers along Y + clearance
-    marker_trough = Rect(trough_x, w, trough_w, trough_h)
+    marker_trough = Rect(trough_x, w, trough_w, full_h)
     return {"board_pocket": board_pocket, "marker_trough": marker_trough}
 
 

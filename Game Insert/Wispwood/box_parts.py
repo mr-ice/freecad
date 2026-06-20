@@ -212,13 +212,14 @@ def build_lower_space():
     """Return the LOWER space: the bottom layer (Z 0..tray top) beside the Wispwood tray.
 
     The box footprint minus the tray, up to the tray's wall top -- the chunky bits (cats on
-    edge, cards, solo tokens, paw) and the folded stand live here.
+    edge, cards, solo tokens) and the folded stand live here. The tray's whole front band is
+    cut across the FULL box width, so no thin sliver is left beside the tray.
     """
     r = bl.bottom_regions()["wispwood"]
     c = cfg.COMPONENT_CLEARANCE
     block = _box(0.0, 0.0, 0.0, cfg.BOX_W, cfg.BOX_L, d.WALL_TOP)
-    tray = _box(r.x - c, r.y - c, -1.0, r.w + 2 * c, r.h + 2 * c, d.WALL_TOP + 2.0)
-    return block.cut(tray)
+    cut = _box(-1.0, r.y - c, -1.0, cfg.BOX_W + 2.0, r.h + 2 * c, d.WALL_TOP + 2.0)
+    return block.cut(cut)
 
 
 def _placed(name, shape, x, y, z, rgb, rot=0.0):
