@@ -292,17 +292,27 @@ def _diag_slot(yc, zc, x0, depth, length, width, angle_deg):
     return slot.fuse(bar)
 
 
-def _stand_divot(dy, dz):
-    """Return a cutter for one stand-peg divot in the tray's max-X long wall (enters ``-X``).
+# Divot X positions on the tray's min-Y front face, derived from the stand peg inset so the
+# tray registers onto the stand pegs. The stand is wider than the tray by the side lips, so the
+# tray (centred on it) maps the stand pegs inward by that half-difference.
+_STAND_HALF_EXTRA = cfg.ALT_SHELF_SIDE_LIP_W + cfg.ALT_SHELF_SIDE_CLEAR
+DIVOT_XS = (
+    cfg.ALT_PEG_INSET - _STAND_HALF_EXTRA,
+    OUTER_WIDTH + _STAND_HALF_EXTRA - cfg.ALT_PEG_INSET,
+)
+
+
+def _stand_divot(dx, dz):
+    """Return a cutter for one stand-peg divot in the tray's min-Y front face (enters ``+Y``).
 
     A lofted negative of the stand locating peg (matching dimensions grown by
-    ``ALT_PEG_CLEAR``): narrow in Y, tapering in Z, mouth at the ``X = OUTER_WIDTH`` face and
+    ``ALT_PEG_CLEAR``): narrow in X, tapering in Z, mouth at the ``Y = 0`` front face and
     narrowing inward, so the tray snaps onto the peg.
 
     Parameters
     ----------
-    dy, dz : float
-        Divot centre on the wall (Y along the tray length, Z up the wall).
+    dx, dz : float
+        Divot centre on the front face (X across the tray, Z up the wall).
 
     Returns
     -------
@@ -310,23 +320,23 @@ def _stand_divot(dy, dz):
         The divot cutter solid.
     """
     clr = cfg.ALT_PEG_CLEAR
-    yw = cfg.ALT_LIP_PEG_W / 2.0 + clr  # narrow half-width in Y
+    xw = cfg.ALT_LIP_PEG_W / 2.0 + clr  # narrow half-width in X
     zb = cfg.ALT_LIP_PEG_R + clr  # mouth half-height in Z
     zt = cfg.ALT_LIP_PEG_TOP_R + clr  # tip half-height in Z
     dep = cfg.ALT_LIP_PEG_H
 
-    def _rect(x, zh):
+    def _rect(y, zh):
         pts = [
-            Vector(x, dy - yw, dz - zh),
-            Vector(x, dy + yw, dz - zh),
-            Vector(x, dy + yw, dz + zh),
-            Vector(x, dy - yw, dz + zh),
+            Vector(dx - xw, y, dz - zh),
+            Vector(dx + xw, y, dz - zh),
+            Vector(dx + xw, y, dz + zh),
+            Vector(dx - xw, y, dz + zh),
         ]
         pts.append(pts[0])
         return Part.makePolygon(pts)
 
-    mouth = _rect(OUTER_WIDTH + 0.5, zb)  # slightly proud of the wall face
-    tip = _rect(OUTER_WIDTH - dep, zt)  # deepest point inside the wall
+    mouth = _rect(-0.5, zb)  # slightly proud of the front face (Y = 0)
+    tip = _rect(dep, zt)  # deepest point inside the wall
     return Part.makeLoft([mouth, tip], True)
 
 
@@ -397,9 +407,9 @@ def build_tray():
                 )
             )
 
-    # Stand-peg divots in the max-X long wall, so the tray snaps onto the stand's locating pegs.
-    for dy in cfg.ALT_DIVOT_YS:
-        tray = tray.cut(_stand_divot(dy, cfg.ALT_DIVOT_Z))
+    # Stand-peg divots in the min-Y front face, so the tray snaps onto the stand's locating pegs.
+    for dx in DIVOT_XS:
+        tray = tray.cut(_stand_divot(dx, cfg.ALT_DIVOT_Z))
 
     return tray
 
