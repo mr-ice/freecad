@@ -119,8 +119,8 @@ ALT_LIP_LEG_FLAT = 8.0  # width of the flat (bridged) span under the lip; the an
 # seats in a matching divot in the tray front.
 ALT_LIP_DOWN = 3.5  # how far the lip edge posts extend below the shelf face (= half frame height)
 # Filleted gusset bracing each tall lip edge post: a quarter-round centred on the shelf's outer
-# side rail (supported by it), narrow in X, tall/deep (Z and Y) via the fillet radius.
-ALT_LIP_GUSSET_W = 9.0  # gusset width in X (centred on the side rail; within the lip extension)
+# side rail. Its width is DERIVED in stand.py from the rail's flat-top width (so it sits fully on
+# the flat and never overhangs the rounded sides); the fillet radius sets its height (Z) and reach.
 ALT_LIP_GUSSET_R = (
     10.0  # gusset fillet radius = its height up the post and reach back along the rail
 )

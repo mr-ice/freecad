@@ -204,7 +204,7 @@ def _tray_lip():
     down = cfg.ALT_LIP_DOWN
 
     lip = _box(ROD_R, ly, T, W - 2 * ROD_R, lt, h_low)  # low lip across the whole width
-    gw = cfg.ALT_LIP_GUSSET_W
+    gw = 2.0 * math.sqrt(ROD_R**2 - (T / 2.0) ** 2)  # rail flat-top width (gusset sits on it)
     gr = cfg.ALT_LIP_GUSSET_R
     for edge_x, fg in ((0.0, FG_XS[0]), (W, FG_XS[1])):
         x_lo, x_hi = min(edge_x, fg), max(edge_x, fg)
