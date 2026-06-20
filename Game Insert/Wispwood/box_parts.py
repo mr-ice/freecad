@@ -1,11 +1,11 @@
 """FreeCAD reference solids for the loose box components + the leftover-space block.
 
-Models every remaining game component (the four outer map sections, the inner map section, the
-card deck, the 1st-player paw, the solo tokens, the cat tokens, the markers, and the score pad)
-as a reference solid at its real size, arranged inside the box. It splits the space not used by
-the Wispwood tray into a **lower** layer (beside the tray, for the chunky bits + folded stand)
-and an **upper** layer (over the whole footprint, for the flat large bits), then places each
-component into them -- the basis for the reworked organizer (the old small tray is retired).
+Models the game components as reference solids at real size. The flat large bits (board
+sections, markers, paw, score pad) live in the kept **top tray** (see :mod:`box_insert`); this
+module focuses the rework on the **bottom** layer: :func:`build_lower_space` is the stock (box
+footprint minus the Wispwood tray, up to the tray top) and :func:`build_all` arranges the chunky
+bottom contents in it (cards, cats on edge, solo tokens). The folded stand also sits in this
+layer (placed by ``box_insert.place_stand``). The old small tray is retired.
 
 Fungible multiples (solo tokens, cats, markers) are modelled as a single **stack** (the storage
 envelope) rather than separate pieces; the four outer map sections are separate objects. The
@@ -17,7 +17,7 @@ Public API
 ----------
 ``build_perimeter_map``, ``build_center_map``, ``build_cards``, ``build_paw``,
 ``build_solo_tokens``, ``build_cats``, ``build_markers``, ``build_scorepad``,
-``build_lower_space``, ``build_upper_space``, ``build_all``.
+``build_lower_space``, ``build_all``.
 """
 
 import math
@@ -221,15 +221,6 @@ def build_lower_space():
     return block.cut(tray)
 
 
-def build_upper_space():
-    """Return the UPPER space: the top layer (Z tray top..box top) over the whole footprint.
-
-    The flat large bits (board sections, markers, score pad) rest here, on top of the tray and
-    the lower layer.
-    """
-    return _box(0.0, 0.0, d.WALL_TOP, cfg.BOX_W, cfg.BOX_L, cfg.BOX_H - d.WALL_TOP)
-
-
 def _placed(name, shape, x, y, z, rgb, rot=0.0):
     """Return a part tuple with ``shape`` rotated ``rot`` deg about Z, bbox min moved to (x,y,z)."""
     if rot:
@@ -240,49 +231,22 @@ def _placed(name, shape, x, y, z, rgb, rot=0.0):
 
 
 def build_all():
-    """Build the two spaces + every component arranged inside them (the small tray is retired).
+    """Build the lower space + the chunky bits arranged in it (the small tray is retired).
 
-    Lower layer (beside the tray): cards, paw, cats on edge, solo tokens. Upper layer (over the
-    whole box): the 5 board sections (stacked), the markers, the score pad. The folded stand is
-    placed separately by ``box_insert.place_stand``; these positions avoid its bay. A first-pass
-    arrangement -- drag/adjust in FreeCAD.
+    We model only the BOTTOM layer here: the flat large bits (board sections, markers, paw,
+    score pad) live in the kept top tray above. The bottom layer (beside the tray) holds the
+    cards, the cats on edge, and the solo-token stack -- the contents the new bottom organizer
+    must hold. Positions avoid the folded-stand bay (placed by ``box_insert.place_stand``). A
+    first-pass arrangement -- drag/adjust in FreeCAD.
 
     Returns
     -------
     list of tuple
         ``(name, shape, (r, g, b), visible, transparency)``.
     """
-    uz = d.WALL_TOP + cfg.COMPONENT_CLEARANCE  # upper-layer floor
-    bt = cfg.BOARD_THICKNESS
-    parts = [
-        ("LowerSpace", build_lower_space(), (0.55, 0.6, 0.6), True, 82),
-        ("UpperSpace", build_upper_space(), (0.5, 0.6, 0.72), True, 86),
-    ]
-    # --- Lower layer (Z 0), clear of the stand bay (X < ~93, Y 88..202) -----------------------
+    parts = [("LowerSpace", build_lower_space(), (0.55, 0.6, 0.6), True, 82)]
+    # Bottom layer (Z 0), clear of the stand bay (X < ~93, Y 88..202).
     parts.append(_placed("Cards", build_cards(), 96.0, 90.0, 0.0, (0.85, 0.75, 0.45), rot=90.0))
-    parts.append(_placed("PawToken", build_paw(), 96.0, 157.0, 0.0, (0.85, 0.55, 0.55)))
     parts.append(_placed("CatTokensx6", build_cats(), 10.0, 210.0, 0.0, (0.70, 0.50, 0.80)))
     parts.append(_placed("SoloTokensx8", build_solo_tokens(), 56.0, 210.0, 0.0, (0.55, 0.55, 0.85)))
-    # --- Upper layer (Z = uz): board sections stacked, markers, score pad ----------------------
-    for i in range(4):  # four identical outer sections, stacked
-        parts.append(
-            _placed(
-                f"MapOuter{i + 1}",
-                build_perimeter_map(),
-                3.0,
-                5.0,
-                uz + i * bt,
-                (0.45, 0.65, 0.45),
-                rot=90.0,
-            )
-        )
-    parts.append(
-        _placed("MapCenter", build_center_map(), 3.0, 5.0, uz + 4 * bt, (0.30, 0.55, 0.30))
-    )
-    parts.append(
-        _placed("Markersx4", build_markers(), 97.0, 25.0, uz, (0.50, 0.75, 0.80), rot=90.0)
-    )
-    parts.append(
-        _placed("ScorePad", build_scorepad(), 3.0, 25.0, uz + 5 * bt + 2.0, (0.80, 0.80, 0.60))
-    )
     return parts

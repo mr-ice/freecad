@@ -57,9 +57,11 @@ tray = [
     (name, shape, rgb, True, 80)
     for name, shape, rgb, _v, _t in box_insert.place_wispwood(wispwood.build_all())
 ]
-reference = [("BoxReference", box_insert.build_box_reference(), (0.6, 0.6, 0.6), False, 80)]
+# Top tray + box-reference shell (box_insert.build_all), the folded stand, and the bottom-space
+# model (box_parts). We design the organizer in the bottom space; the top tray is kept.
+insert = list(box_insert.build_all())
 folded_stand = list(box_insert.place_stand(stand.build_all()))
-parts = tray + reference + folded_stand + list(box_parts.build_all())
+parts = tray + insert + folded_stand + list(box_parts.build_all())
 
 for name, shape, rgb, visible, transparency in parts:
     obj = doc.addObject("Part::Feature", name)
