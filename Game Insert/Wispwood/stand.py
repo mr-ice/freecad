@@ -3,13 +3,15 @@
 Three print-in-place parts that hold the tray upright at ``STAND_DEPLOY_ANGLE``:
 
 - **Shelf** — an empty rounded rectangle drawn as a **continuous rod path** (straight runs
-  joined by quarter-torus corner fillets, no crossing cylinders). A crossmember rod carries a
-  **tray lip** (deep at the edges, filleted down to clear the tray finger grooves). The bottom
-  rod necks to **pins** for the base hinge; the crossmember rod necks for the leg hinge.
+  joined by quarter-torus corner fillets). A crossmember rod carries a **tray lip** (deep at the
+  edges, filleted down to clear the tray finger grooves, with a braced **gusset** under each
+  edge post). Two rounded bottom **ears** end in **male cones** for the base hinge; the
+  crossmember rod necks to a pin for the leg hinge.
 - **Base** — a flat **open rod rectangle** lying on the table (the sole contact, so it cannot
-  rock), hinged on the shelf bottom-rod pins via two bored knuckles. It reaches a **forward
-  foot** ``ALT_BASE_FWD`` ahead of the hinge (catching the loaded CG) and back to a **snap
-  cradle**. The shelf folds flat on top of it.
+  rock). A **solid bar** across the hinge axis carries a **conical socket** at each end that the
+  shelf ear's cone pivots in — a strong **cone interface**, no through-pin. It reaches a
+  **forward foot** ``ALT_BASE_FWD`` ahead of the hinge (catching the loaded CG) and back to twin
+  **snap cradles**. The shelf folds flat on top of it.
 - **Leg** — hinged on the shelf crossmember (bar continued onto the cylinder, bored through).
   Its end cross-cylinder spans the base width and snaps into the base cradle to lock the angle.
 
@@ -66,6 +68,14 @@ NECK_XS = (LEG_CX - _BL_OFFSET, LEG_CX + _BL_OFFSET)  # knuckle / base-rail cent
 BASE_X0 = NECK_XS[0] - ROD_R  # base outer X extent
 BASE_X1 = NECK_XS[1] + ROD_R
 
+# Cone-pivot base/shelf hinge: the solid base bar spans BASE_X0..BASE_X1 at the hinge axis; the
+# shelf ears sit OUTBOARD of those ends (XLI/XRI) and pivot on cones into the bar's end sockets.
+XLI = BASE_X0  # left cone interface (base-bar left end / shelf left-ear inner face)
+XRI = BASE_X1  # right cone interface
+CONE_R = cfg.ALT_CONE_R
+CONE_LEN = cfg.ALT_CONE_LEN
+CONE_CLEAR = cfg.ALT_CONE_CLEAR
+
 # Deployed lock geometry (computed in derived.py): cradle line behind the bottom hinge.
 B_BASE = d.ALT_B_BASE
 X_LOCK = B_BASE  # kept name for downstream offsets
@@ -105,6 +115,11 @@ def _xcyl(r, length, x, y, z):
 def _ycyl(r, length, x, y, z):
     """Return a cylinder of radius ``r`` along ``+Y`` from ``(x, y, z)``."""
     return Part.makeCylinder(r, length, Vector(x, y, z), Vector(0.0, 1.0, 0.0))
+
+
+def _xcone(r1, r2, length, x, y, z, sign):
+    """Return a cone (radius ``r1`` at the base to ``r2``) along ``sign``·X from ``(x, y, z)``."""
+    return Part.makeCone(r1, r2, length, Vector(x, y, z), Vector(float(sign), 0.0, 0.0))
 
 
 def _flat(shape):
@@ -189,11 +204,18 @@ def _tray_lip():
     down = cfg.ALT_LIP_DOWN
 
     lip = _box(ROD_R, ly, T, W - 2 * ROD_R, lt, h_low)  # low lip across the whole width
+    rg = ROD_R - 1.0  # gusset fillet radius = crossmember material behind the lip (stays supported)
     for edge_x, fg in ((0.0, FG_XS[0]), (W, FG_XS[1])):
         x_lo, x_hi = min(edge_x, fg), max(edge_x, fg)
         post = _box(x_lo, ly, T - down, x_hi - x_lo, lt, h_edge + down)  # extends down to the frame
         post = post.cut(_ycyl(r_f, lt + 2.0, fg, ly - 1.0, T + h_edge))  # fillet down to fg
         lip = lip.fuse(post)
+        # Filleted gusset on the back (-Y) face of the post, sitting on the crossmember, bracing
+        # the tall post against bending. A quarter-round concave fillet; the shelf frame is
+        # untouched (the gusset only sits on the Z = T surface over the crossmember).
+        gbox = _box(x_lo, ly - rg, T, x_hi - x_lo, rg, rg)
+        gcut = _xcyl(rg, (x_hi - x_lo) + 2.0, x_lo - 1.0, ly - rg, T + rg)
+        lip = lip.fuse(gbox.cut(gcut))
 
     # Clearance so the lip does not fuse to the leg hinge passing under it: a narrow flat span
     # raised by ALT_LIP_LEG_GAP in the middle, with angled lead-ins running out to the leg edges
@@ -230,12 +252,17 @@ def build_shelf():
     Part.Shape
         The shelf solid (flat orientation).
     """
-    base_necks = [(nc, BASE_KNUCKLE_W + 2 * ACLR) for nc in NECK_XS]
     run = (W - ROD_R - CR) - (ROD_R + CR)
     rise = (SHELF_H - ROD_R - CR) - (ROD_R + CR)
-    # Bottom rod is a ROUND Ø7 hinge rod (KNUCK_R): being a circle tangent to the bed it rotates
-    # up with the shelf without its corner dipping below the table (a flattened rod would).
-    shelf = _necked_rod(HBY, ROD_R + CR, W - ROD_R - CR, base_necks, r=KNUCK_R)
+    # Bottom: two ROUND Ø7 ear rods (KNUCK_R) on the outside, open in the middle where the base's
+    # solid hinge bar sits. Each ear ends (a clearance gap short of the bar) in a male cone that
+    # pivots in the base-bar end socket.
+    el = XLI - CONE_CLEAR  # left ear inner face (gap to the bar)
+    er = XRI + CONE_CLEAR  # right ear inner face
+    shelf = _xcyl(KNUCK_R, el - (ROD_R + CR), ROD_R + CR, HBY, ZC)  # left ear rod
+    shelf = shelf.fuse(_xcyl(KNUCK_R, (W - ROD_R - CR) - er, er, HBY, ZC))  # right ear rod
+    shelf = shelf.fuse(_xcone(CONE_R, 0.0, CONE_LEN, el, HBY, ZC, +1))  # left male cone (+X)
+    shelf = shelf.fuse(_xcone(CONE_R, 0.0, CONE_LEN, er, HBY, ZC, -1))  # right male cone (-X)
     shelf = shelf.fuse(_xcyl(ROD_R, run, ROD_R + CR, SHELF_H - ROD_R, ZC))  # top
     shelf = shelf.fuse(_ycyl(ROD_R, rise, ROD_R, ROD_R + CR, ZC))  # left
     shelf = shelf.fuse(_ycyl(ROD_R, rise, W - ROD_R, ROD_R + CR, ZC))  # right
@@ -285,24 +312,31 @@ def _lock_cradle(nc):
     return cradle.fuse(ramp)
 
 
-def _base_knuckle(nc):
-    """Return one base hinge knuckle: a ROUND Ø7 X-cylinder at the hinge axis, bored for the pin.
+def _hinge_bar():
+    """Return the base's solid hinge bar with a conical socket at each end.
 
-    Centred on a side rail at ``x = nc``, ``Y = HBY``; the rail merges into it. Round (``KNUCK_R``)
-    so it rotates cleanly on the shelf bottom-rod pin (a print-in-place hinge along ``X``).
+    A solid Ø7 bar across the middle of the hinge axis (``Y = HBY``), spanning ``XLI..XRI`` with
+    the bar set in by the clearance from each shelf ear. Each end carries a conical socket (the
+    male cone grown by ``CONE_CLEAR``) that the shelf ear's cone pivots in — a strong cone bearing
+    in place of a through-pin.
     """
-    x0 = nc - BASE_KNUCKLE_W / 2.0
-    knuckle = _xcyl(KNUCK_R, BASE_KNUCKLE_W, x0, HBY, ZC)
-    return knuckle.cut(_xcyl(BORE, BASE_KNUCKLE_W + 2.0, x0 - 1.0, HBY, ZC))
+    bar = _xcyl(KNUCK_R, XRI - XLI, XLI, HBY, ZC)
+    bar = bar.cut(
+        _xcone(CONE_R + CONE_CLEAR, 0.0, CONE_LEN + CONE_CLEAR, XLI - CONE_CLEAR, HBY, ZC, +1)
+    )
+    bar = bar.cut(
+        _xcone(CONE_R + CONE_CLEAR, 0.0, CONE_LEN + CONE_CLEAR, XRI + CONE_CLEAR, HBY, ZC, -1)
+    )
+    return bar
 
 
 def build_base():
-    """Build the base: a flat open rod rectangle on the hinge knuckles + a snap cradle.
+    """Build the base: a flat open rod rectangle + a solid cone-pivot hinge bar + snap cradles.
 
     A rounded rod rectangle (rails at ``NECK_XS``) lying flat on the table — the sole table
-    contact, so it cannot rock. It reaches a forward foot ``ALT_BASE_FWD`` ahead of the hinge
-    and back past the cradle. Two bored knuckles at the hinge axis interleave the shelf bottom
-    rod's pins.
+    contact, so it cannot rock. It reaches a forward foot ``ALT_BASE_FWD`` ahead of the hinge and
+    back past the cradles. A solid bar across the hinge axis carries the cone sockets that the
+    shelf ears pivot in (no through-pin).
 
     Returns
     -------
@@ -323,8 +357,8 @@ def build_base():
     base = base.fuse(_corner(xr - CR, yb - CR, 0.0))  # back-right
     base = base.fuse(_corner(xl + CR, yb - CR, 90.0))  # back-left
 
-    # Print-in-place hinge knuckles at the axis (Y = HBY), between the foot and the frame.
-    base = base.fuse(_base_knuckle(NECK_XS[0])).fuse(_base_knuckle(NECK_XS[1]))
+    # Solid cone-pivot hinge bar across the axis (the shelf ears pivot in its end sockets).
+    base = base.fuse(_hinge_bar())
 
     # Solid pads (Z[0, T]) under each cradle: the cradle boss is wider than its rail, so it would
     # overhang; the pad fills the base out to the rear rod there, fully supporting the boss and

@@ -88,6 +88,13 @@ GRIP_SLOT_ANGLE = -60.0  # slot tilt above horizontal (deg)
 STAND_DEPLOY_ANGLE = 75.0  # locked shelf angle above the table (deg)
 ALT_BARREL_NECK_R = 2.0  # hinge pin radius (the shelf rods neck to this for the print-in-place pin)
 ALT_SNAP_CLEAR = 0.15  # cradle seat clearance over the leg end cylinder (smaller = stronger click)
+# Base/shelf hinge: a CONE interface (not a through-pin). The base hinge is a SOLID bar in the
+# middle (strong); the shelf has rounded ears on the outside, each ending in a male cone that
+# pivots in a conical socket at the bar end. Cones bear over a large area and resist pull-off by
+# wedging, so the hinge is far stronger than the old thin pin.
+ALT_CONE_R = 3.0  # cone base radius at the interface (the pivot bearing)
+ALT_CONE_LEN = 3.5  # cone axial length, tapering to a point (sets the cone half-angle)
+ALT_CONE_CLEAR = 0.3  # cone bearing clearance (the socket is the cone grown by this)
 # Rod-frame stand (per stand.md): shelf is a rounded rectangle of rod; base is an H hinged on
 # the shelf's bottom rod (necked to a pin); the leg hinges on the shelf crossmember and its
 # end-cylinder clicks into the base.
