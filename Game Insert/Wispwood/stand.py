@@ -91,10 +91,10 @@ FOOT_EXT = LIP_EDGE_H  # base legs extend this far forward (-Y) out the front of
 NATIVE_Y_MIN = -FOOT_EXT  # the forward feet are the most-forward point
 DISPLAY_X_OFFSET = W + 30.0
 
-# Locating-peg X positions: inset from each tray edge (the tray is centred on the wider shelf),
-# shared with the tray divots so they register.
+# Locating-peg X positions: near the outer (min/max X) edges of the shelf, shared with the tray
+# divots so they register.
 _TRAY_OFFSET = (W - d.OUTER_WIDTH) / 2.0
-PEG_XS = (_TRAY_OFFSET + cfg.ALT_PEG_INSET, _TRAY_OFFSET + d.OUTER_WIDTH - cfg.ALT_PEG_INSET)
+PEG_XS = (cfg.ALT_PEG_INSET, W - cfg.ALT_PEG_INSET)
 
 
 def _box(x, y, z, dx, dy, dz):
@@ -132,26 +132,27 @@ def _xz_prism(pts_xz, y0, dy):
 
 
 def _peg(px, pz, py):
-    """Return a pyramid locating peg protruding ``+Y`` from a lip face at ``(px, py, pz)``.
+    """Return a locating peg protruding ``+Y`` from a lip face at ``(px, py, pz)``.
 
-    A truncated pyramid (square base on the face, smaller tip out along ``+Y``); its faces are
-    all angled, so the downward face self-supports when printed flat.
+    A ridge: narrow in X with vertical (perpendicular) X sides, tapering only in Z from base to
+    tip, so the downward Z face is angled and self-supports when printed flat.
     """
-    bw = cfg.ALT_LIP_PEG_R  # base half-extent
-    tw = cfg.ALT_LIP_PEG_TOP_R  # tip half-extent
+    xw = cfg.ALT_LIP_PEG_W / 2.0  # narrow half-width in X (vertical, perpendicular sides)
+    zb = cfg.ALT_LIP_PEG_R  # base half-height in Z
+    zt = cfg.ALT_LIP_PEG_TOP_R  # tip half-height in Z
     dep = cfg.ALT_LIP_PEG_H  # +Y protrusion
 
-    def _rect(y, hw):
+    def _rect(y, zh):
         pts = [
-            Vector(px - hw, y, pz - hw),
-            Vector(px + hw, y, pz - hw),
-            Vector(px + hw, y, pz + hw),
-            Vector(px - hw, y, pz + hw),
+            Vector(px - xw, y, pz - zh),
+            Vector(px + xw, y, pz - zh),
+            Vector(px + xw, y, pz + zh),
+            Vector(px - xw, y, pz + zh),
         ]
         pts.append(pts[0])
         return Part.makePolygon(pts)
 
-    return Part.makeLoft([_rect(py, bw), _rect(py + dep, tw)], True)
+    return Part.makeLoft([_rect(py, zb), _rect(py + dep, zt)], True)
 
 
 def _corner(cx, cy, start_deg):
@@ -218,9 +219,10 @@ def _tray_lip():
     )
     lip = lip.cut(cutter)
 
-    # Pyramid locating pegs on the +Y face of each edge post (toward the tray), at mid-height.
+    # Locating pegs on the +Y face of each edge post (toward the tray), near the top (max Z).
+    peg_pz = T + h_edge - cfg.ALT_LIP_PEG_R - 1.0
     for px in PEG_XS:
-        lip = lip.fuse(_peg(px, T + h_edge / 2.0, ly + lt))
+        lip = lip.fuse(_peg(px, peg_pz, ly + lt))
     return lip
 
 

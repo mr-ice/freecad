@@ -148,10 +148,11 @@ ALT_LIP_LEG_FLAT = 8.0  # width of the flat (bridged) span under the lip; the an
 # edge posts extend down to connect to the frame; each lip post carries a locating peg that
 # seats in a matching divot in the tray front.
 ALT_LIP_DOWN = 3.5  # how far the lip edge posts extend below the shelf face (= half frame height)
-ALT_LIP_PEG_R = 3.0  # locating-peg base radius (cone)
-ALT_LIP_PEG_TOP_R = 1.2  # locating-peg tip radius (cone narrows for an angled, printable face)
-ALT_LIP_PEG_H = 3.0  # locating-peg height
-ALT_PEG_INSET = 9.0  # peg / tray-divot inset from each tray edge
+ALT_LIP_PEG_W = 3.0  # locating-peg width in X (narrow, with perpendicular/vertical X sides)
+ALT_LIP_PEG_R = 3.0  # locating-peg base half-height in Z (tapers in Z to the tip)
+ALT_LIP_PEG_TOP_R = 1.2  # locating-peg tip half-height in Z
+ALT_LIP_PEG_H = 3.0  # locating-peg protrusion (+Y)
+ALT_PEG_INSET = 6.0  # peg inset from each shelf edge (pegs near min/max X, near the top)
 ALT_PEG_CLEAR = 0.3  # divot oversize over the peg
 
 SHOW_ALT_STAND = True
