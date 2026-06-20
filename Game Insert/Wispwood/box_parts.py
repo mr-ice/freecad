@@ -141,6 +141,11 @@ def build_perimeter_map():
     return _profile_solid(_OUTER_MAP_PROFILE, cfg.BOARD_THICKNESS)
 
 
+def build_outer_map_stack():
+    """Return the four identical outer map sections as a single stacked solid (~186 x 90 mm)."""
+    return _profile_solid(_OUTER_MAP_PROFILE, 4 * cfg.BOARD_THICKNESS)
+
+
 def build_center_map():
     """Return the inner map section: an octagon (``BOARD_CENTER_PTP`` ptp) with scalloped edges.
 
@@ -219,7 +224,20 @@ def build_lower_space():
     c = cfg.COMPONENT_CLEARANCE
     block = _box(0.0, 0.0, 0.0, cfg.BOX_W, cfg.BOX_L, d.WALL_TOP)
     cut = _box(-1.0, r.y - c, -1.0, cfg.BOX_W + 2.0, r.h + 2 * c, d.WALL_TOP + 2.0)
-    return block.cut(cut)
+    block = block.cut(cut)
+    # Fillet the two back vertical corners (which sit in the box's rounded interior corners).
+    rr = cfg.BOX_CORNER_R
+    corners = []
+    for e in block.Edges:
+        bb = e.BoundBox
+        vertical = abs(bb.ZLength - d.WALL_TOP) < 1e-6 and bb.XLength < 0.5 and bb.YLength < 0.5
+        at_back = abs(bb.YMax - cfg.BOX_L) < 0.5
+        at_side = abs(bb.XMin) < 0.5 or abs(bb.XMax - cfg.BOX_W) < 0.5
+        if vertical and at_back and at_side:
+            corners.append(e)
+    if corners:
+        block = block.makeFillet(rr, corners)
+    return block
 
 
 def _placed(name, shape, x, y, z, rgb, rot=0.0):
@@ -257,18 +275,17 @@ def build_all():
     top = cfg.SMALL_TRAY_RIM_Z + cfg.TOP_TRAY_DEPTH  # top-tray rim (loose items rest here)
     bp = bl.top_regions()["board_pocket"]
     mt = bl.top_regions()["marker_trough"]
-    for i in range(4):  # four identical outer sections, stacked in the board pocket
-        parts.append(
-            _placed(
-                f"MapOuter{i + 1}",
-                build_perimeter_map(),
-                bp.x + 2.0,
-                bp.y + 2.0,
-                tz + i * bt,
-                (0.45, 0.65, 0.45),
-                rot=90.0,
-            )
+    parts.append(
+        _placed(
+            "MapOuterStack",
+            build_outer_map_stack(),
+            bp.x + 2.0,
+            bp.y + 2.0,
+            tz,
+            (0.45, 0.65, 0.45),
+            rot=90.0,
         )
+    )
     parts.append(
         _placed(
             "MapCenter", build_center_map(), bp.x + 2.0, bp.y + 2.0, tz + 4 * bt, (0.30, 0.55, 0.30)

@@ -213,6 +213,7 @@ TRAY_LID_TRANSPARENCY = 80
 BOX_W = 185.0  # box interior width (X)
 BOX_L = 265.0  # box interior length (Y)
 BOX_H = 65.0  # box interior height (Z)
+BOX_CORNER_R = 4.0  # box interior vertical corner radius (insert outer corners filleted to fit)
 STOCK_THICKNESS = TILE_THICKNESS  # all flat cardboard stock (~2.133)
 
 # Cat tokens: double tree-tile thickness, stored ON EDGE (35x35 face vertical).
