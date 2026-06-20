@@ -231,13 +231,13 @@ def _placed(name, shape, x, y, z, rgb, rot=0.0):
 
 
 def build_all():
-    """Build the lower space + the chunky bits arranged in it (the small tray is retired).
+    """Build the lower space + every component placed for a full fit-check.
 
-    We model only the BOTTOM layer here: the flat large bits (board sections, markers, paw,
-    score pad) live in the kept top tray above. The bottom layer (beside the tray) holds the
-    cards, the cats on edge, and the solo-token stack -- the contents the new bottom organizer
-    must hold. Positions avoid the folded-stand bay (placed by ``box_insert.place_stand``). A
-    first-pass arrangement -- drag/adjust in FreeCAD.
+    The BOTTOM layer (the rework focus) holds the cards, cats on edge, and solo tokens beside
+    the tray, clear of the folded-stand bay (placed by ``box_insert.place_stand``). The TOP
+    layer is shown for fit-checking against the kept top tray: the board sections (stacked) and
+    markers sit in the top-tray pockets, and the paw + score pad lie loose on top. A first-pass
+    arrangement -- drag/adjust in FreeCAD.
 
     Returns
     -------
@@ -245,8 +245,39 @@ def build_all():
         ``(name, shape, (r, g, b), visible, transparency)``.
     """
     parts = [("LowerSpace", build_lower_space(), (0.55, 0.6, 0.6), True, 82)]
-    # Bottom layer (Z 0), clear of the stand bay (X < ~93, Y 88..202).
+    # --- Bottom layer (Z 0), clear of the stand bay (X < ~93, Y 88..202) -----------------------
     parts.append(_placed("Cards", build_cards(), 96.0, 90.0, 0.0, (0.85, 0.75, 0.45), rot=90.0))
     parts.append(_placed("CatTokensx6", build_cats(), 10.0, 210.0, 0.0, (0.70, 0.50, 0.80)))
     parts.append(_placed("SoloTokensx8", build_solo_tokens(), 56.0, 210.0, 0.0, (0.55, 0.55, 0.85)))
+
+    # --- Top layer (fit-check): board + markers in the top-tray pockets, paw + pad loose on top
+    bt = cfg.BOARD_THICKNESS
+    tz = cfg.SMALL_TRAY_RIM_Z + cfg.INSERT_FLOOR  # top-tray pocket floor
+    top = cfg.SMALL_TRAY_RIM_Z + cfg.TOP_TRAY_DEPTH  # top-tray rim (loose items rest here)
+    bp = bl.top_regions()["board_pocket"]
+    mt = bl.top_regions()["marker_trough"]
+    for i in range(4):  # four identical outer sections, stacked in the board pocket
+        parts.append(
+            _placed(
+                f"MapOuter{i + 1}",
+                build_perimeter_map(),
+                bp.x + 2.0,
+                bp.y + 2.0,
+                tz + i * bt,
+                (0.45, 0.65, 0.45),
+                rot=90.0,
+            )
+        )
+    parts.append(
+        _placed(
+            "MapCenter", build_center_map(), bp.x + 2.0, bp.y + 2.0, tz + 4 * bt, (0.30, 0.55, 0.30)
+        )
+    )
+    parts.append(
+        _placed(
+            "Markersx4", build_markers(), mt.x + 1.0, mt.y + 1.0, tz, (0.50, 0.75, 0.80), rot=90.0
+        )
+    )
+    parts.append(_placed("ScorePad", build_scorepad(), 5.0, 25.0, top, (0.80, 0.80, 0.60)))
+    parts.append(_placed("PawToken", build_paw(), 110.0, 25.0, top, (0.85, 0.55, 0.55)))
     return parts
