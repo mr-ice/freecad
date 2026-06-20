@@ -240,6 +240,7 @@ MARKER_THICKNESS = STOCK_THICKNESS
 # pieces are a quarter of the octagonal ring between the center octagon and the outer octagon
 # (each centred on a corner, two full outer sides, cut at the adjacent corners).
 BOARD_CENTER_PTP = 135.0  # center octagon, point-to-point
+BOARD_CENTER_WAVE = 3.0  # center-octagon edges bow inward (concave) by this sagitta (scalloped)
 BOARD_ASSEMBLED_PTP = 268.0  # full assembled board (outer octagon), point-to-point
 BOARD_PERIM_W = 86.0  # perimeter-piece bounding box (1/4 octagon) -- measured, for reference
 BOARD_PERIM_L = 190.0

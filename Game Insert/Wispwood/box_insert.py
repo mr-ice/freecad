@@ -12,7 +12,7 @@ All offsets derive from named constants (repo ``CLAUDE.md``); no measured coordi
 
 Public API
 ----------
-``build_small_tray``, ``build_top_tray``, ``build_box_reference``, ``build_all``,
+``build_top_tray``, ``build_box_reference``, ``build_all``,
 ``place_wispwood``, ``place_stand``.
 """
 
@@ -35,64 +35,6 @@ def _assert_within_bed(shape, name):
     assert (
         bb.XLength <= limit and bb.YLength <= limit
     ), f"{name} {bb.XLength:.1f}x{bb.YLength:.1f} exceeds bed {limit}"
-
-
-def build_small_tray():
-    """Build the bottom components tray: cats-on-edge slot, card well, round-token well.
-
-    The tray outer walls rise to ``SMALL_TRAY_RIM_Z`` so the top tray rests flat across it
-    and the Wispwood tray. Each well is cut to its component's depth and gets one vertical
-    finger groove cut through a side wall, running the full height of the hole, so a finger
-    can reach down beside the stack.
-
-    Returns
-    -------
-    Part.Shape
-        The small-tray solid, positioned in the box frame.
-    """
-    b = bl.bottom_regions()
-    tray = b["small_tray"]
-    rim = cfg.SMALL_TRAY_RIM_Z
-    block = _box(tray.x, tray.y, 0.0, tray.w, tray.h, rim)
-
-    # Card well: depth = deck thickness + access margin.
-    card = b["well_card"]
-    card_depth = cfg.CARD_DECK_THICKNESS + 3.0
-    block = block.cut(_box(card.x, card.y, rim - card_depth, card.w, card.h, card_depth + 1.0))
-
-    # Cats on edge: full-height slot (35 deep) so the 35 mm faces stand vertical.
-    cats = b["well_cats"]
-    cats_floor = rim - cfg.CAT_SIZE
-    block = block.cut(_box(cats.x, cats.y, cats_floor - 1.0, cats.w, cats.h, cfg.CAT_SIZE + 2.0))
-
-    # Round tokens: cylindrical well.
-    rnd = b["well_round"]
-    r = cfg.ROUND_TOKEN_DIA / 2.0 + cfg.COMPONENT_CLEARANCE
-    rnd_depth = cfg.ROUND_TOKEN_COUNT * cfg.ROUND_TOKEN_THICKNESS + 3.0
-    cx, cy = rnd.x + rnd.w / 2.0, rnd.y + rnd.h / 2.0
-    block = block.cut(
-        Part.makeCylinder(r, rnd_depth + 1.0, Vector(cx, cy, rim - rnd_depth), Vector(0, 0, 1))
-    )
-
-    # One vertical finger groove per well: a Z-axis cylinder centred on a well side wall (its
-    # radius exceeds the wall, so it cuts through), spanning the full hole height. Each is
-    # placed on a side that backs onto tray body (not a neighbouring well): card +X, cats +Y,
-    # round +X.
-    for groove_cx, groove_cy, floor_z in (
-        (card.x + card.w, card.y + card.h / 2.0, rim - card_depth),  # card: right wall
-        (cats.x + cats.w / 2.0, cats.y + cats.h, cats_floor),  # cats: back (+Y) wall
-        (rnd.x + rnd.w, rnd.y + rnd.h / 2.0, rim - rnd_depth),  # round: right wall
-    ):
-        block = block.cut(
-            Part.makeCylinder(
-                cfg.FINGER_GROOVE_R,
-                (rim + 1.0) - floor_z,
-                Vector(groove_cx, groove_cy, floor_z),
-                Vector(0, 0, 1),
-            )
-        )
-    _assert_within_bed(block, "SmallTray")
-    return block
 
 
 def build_top_tray():
@@ -209,7 +151,6 @@ def build_all():
     top = build_top_tray()
     top.translate(Vector(0.0, 0.0, cfg.SMALL_TRAY_RIM_Z))
     return [
-        ("SmallTray", build_small_tray(), (0.85, 0.75, 0.45), True, 0),
         ("TopTray", top, (0.45, 0.65, 0.85), True, 40),
         ("BoxReference", build_box_reference(), (0.6, 0.6, 0.6), False, 80),
     ]
