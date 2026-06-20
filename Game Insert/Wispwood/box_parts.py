@@ -59,6 +59,11 @@ def _octagon_face(ptp):
     return Part.Face(Part.makePolygon(pts))
 
 
+def _zcyl(r, h, x, y, z):
+    """Return a cylinder of radius ``r`` along ``+Z`` from ``(x, y, z)``."""
+    return Part.makeCylinder(r, h, Vector(x, y, z), Vector(0.0, 0.0, 1.0))
+
+
 def _profile_solid(points, thk):
     """Extrude a closed 2-D outline (list of ``(x, y)`` mm) by ``thk`` in Z, bbox min at origin."""
     pts = [Vector(x, y, 0.0) for x, y in points]
@@ -240,6 +245,43 @@ def build_lower_space():
     return block
 
 
+def build_bottom_tray():
+    """Return a first-pass bottom organizer tray over the back region.
+
+    A floor over the box-back region (filleted to the box's rounded corners), with **tall
+    corner posts at the two back corners** (rising to the tray top to support the top tray over
+    the bottom layer), and a **deep finger scoop** in the front edge, centred on the Wispwood
+    tray, so a finger can reach down beside it and lift it out. The folded stand and the bottom
+    contents (cards, cats, tokens) sit on the floor; component wells are a later step.
+    """
+    r = bl.bottom_regions()["wispwood"]
+    c = cfg.COMPONENT_CLEARANCE
+    y0 = r.y + r.h + c  # front edge of the back region (facing the Wispwood tray)
+    post = 20.0  # back support-post footprint
+    tray = _box(0.0, y0, 0.0, cfg.BOX_W, cfg.BOX_L - y0, cfg.INSERT_FLOOR)  # floor
+    for px in (0.0, cfg.BOX_W - post):  # tall back corner posts to the top-tray rest height
+        tray = tray.fuse(_box(px, cfg.BOX_L - post, 0.0, post, post, d.WALL_TOP))
+    # Fillet the two back vertical outer corners (the box's rounded interior corners).
+    corners = [
+        e
+        for e in tray.Edges
+        if e.BoundBox.ZLength > d.WALL_TOP - 1.0
+        and e.BoundBox.XLength < 0.5
+        and e.BoundBox.YLength < 0.5
+        and abs(e.BoundBox.YMax - cfg.BOX_L) < 0.5
+        and (abs(e.BoundBox.XMin) < 0.5 or abs(e.BoundBox.XMax - cfg.BOX_W) < 0.5)
+    ]
+    if corners:
+        try:
+            tray = tray.makeFillet(cfg.BOX_CORNER_R, corners)
+        except Exception:
+            pass
+    # Deep finger scoop in the front edge, centred on the Wispwood tray, to lift the tray out.
+    sx = r.x + r.w / 2.0
+    tray = tray.cut(_zcyl(cfg.FINGER_GROOVE_R + 4.0, d.WALL_TOP + 1.0, sx, y0, -0.5))
+    return tray
+
+
 def _placed(name, shape, x, y, z, rgb, rot=0.0):
     """Return a part tuple with ``shape`` rotated ``rot`` deg about Z, bbox min moved to (x,y,z)."""
     if rot:
@@ -263,11 +305,12 @@ def build_all():
     list of tuple
         ``(name, shape, (r, g, b), visible, transparency)``.
     """
-    parts = [("LowerSpace", build_lower_space(), (0.55, 0.6, 0.6), True, 82)]
-    # --- Bottom layer (Z 0), clear of the stand bay (X < ~93, Y 88..202) -----------------------
-    parts.append(_placed("Cards", build_cards(), 96.0, 90.0, 0.0, (0.85, 0.75, 0.45), rot=90.0))
-    parts.append(_placed("CatTokensx6", build_cats(), 10.0, 210.0, 0.0, (0.70, 0.50, 0.80)))
-    parts.append(_placed("SoloTokensx8", build_solo_tokens(), 56.0, 210.0, 0.0, (0.55, 0.55, 0.85)))
+    fz = cfg.INSERT_FLOOR  # bottom contents sit on the bottom-tray floor
+    parts = [("BottomTray", build_bottom_tray(), (0.55, 0.6, 0.6), True, 70)]
+    # --- Bottom layer (on the tray floor), clear of the stand bay (X < ~93, Y 88..202) ---------
+    parts.append(_placed("Cards", build_cards(), 96.0, 90.0, fz, (0.85, 0.75, 0.45), rot=90.0))
+    parts.append(_placed("CatTokensx6", build_cats(), 10.0, 210.0, fz, (0.70, 0.50, 0.80)))
+    parts.append(_placed("SoloTokensx8", build_solo_tokens(), 56.0, 210.0, fz, (0.55, 0.55, 0.85)))
 
     # --- Top layer (fit-check): board + markers in the top-tray pockets, paw + pad loose on top
     bt = cfg.BOARD_THICKNESS
