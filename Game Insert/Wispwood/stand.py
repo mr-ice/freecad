@@ -35,11 +35,13 @@ from FreeCAD import Vector
 
 # --- Frame / derived geometry (kinematics live in derived.py) ----------------
 W = d.ALT_SHELF_W
-ROD_R = cfg.ALT_ROD_R  # rod in-plane radius (Ø9)
+ROD_R = cfg.ALT_ROD_R  # rod in-plane radius (Ø9 flattened to T); frame runs and the leg end seat
+KNUCK_R = cfg.ALT_PART_T / 2.0  # round hinge-knuckle radius (Ø7 = full part thickness): a circle
+# tangent to the bed, so a rotating knuckle stays within Z[0, T] and never dips below the table
 T = cfg.ALT_PART_T  # part thickness in Z (7 mm cross-section of the Ø9 rod)
 ZC = d.ALT_ZC  # part mid-plane Z (hinge axis height; base rests on the table)
 HBY = d.ALT_HBY  # bottom-rod (base hinge) axis Y, so the outer face sits at Y = 0
-SHELF_H = cfg.ALT_SHELF_HEIGHT
+SHELF_H = d.ALT_SHELF_HEIGHT  # derived so the folded leg clears the top rod
 CR = cfg.ALT_FRAME_CORNER_R  # frame corner fillet radius
 CROSS_Y = d.ALT_CROSS_Y  # shelf crossmember (tray rest + leg hinge), derived from TRAY_LIFT
 PIN_R = cfg.ALT_BARREL_NECK_R
@@ -49,6 +51,11 @@ LEG_W = cfg.ALT_LEG_WIDTH
 L_LEG = cfg.ALT_LEG_LENGTH
 LEG_CX = W / 2.0
 ALT_S_HINGES = d.ALT_S_HINGES  # hinge-to-hinge distance up the shelf
+
+# Shared-thickness (47/47) split planes for the coplanar print-in-place crossings: the lower
+# part keeps Z[0, SPLIT_LOW], the upper keeps Z[SPLIT_HIGH, T], with ALT_SPLIT_GAP between.
+SPLIT_LOW = (T - cfg.ALT_SPLIT_GAP) / 2.0
+SPLIT_HIGH = SPLIT_LOW + cfg.ALT_SPLIT_GAP
 
 # Base hinge knuckles: two bands flanking the prop leg (inboard of the shelf side rails) so the
 # base interleaves with the shelf bottom rod's pins without the two frames' rails colliding on
@@ -152,16 +159,17 @@ def _corner(cx, cy, start_deg):
     return elbow
 
 
-def _necked_rod(y, x0, x1, necks):
-    """Return an X rod (radius ``ROD_R``) along ``Y = y`` from ``x0`` to ``x1``, necked to pins.
+def _necked_rod(y, x0, x1, necks, r=ROD_R):
+    """Return an X rod (radius ``r``) along ``Y = y`` from ``x0`` to ``x1``, necked to pins.
 
     ``necks`` is an iterable of ``(centre, width)``; over each band the radius drops to
-    ``PIN_R`` so a knuckle rides it as a hinge pin, with full collars between bands.
+    ``PIN_R`` so a knuckle rides it as a hinge pin, with full collars between bands. Pass
+    ``r = KNUCK_R`` for a round (Ø7) hinge rod that rotates without dipping below the table.
     """
-    rod = _xcyl(ROD_R, x1 - x0, x0, y, ZC)
+    rod = _xcyl(r, x1 - x0, x0, y, ZC)
     for nc, nw in necks:
         nx = nc - nw / 2.0
-        rod = rod.cut(_xcyl(ROD_R + 0.5, nw, nx, y, ZC))
+        rod = rod.cut(_xcyl(r + 0.5, nw, nx, y, ZC))
         rod = rod.fuse(_xcyl(PIN_R, nw, nx, y, ZC))
     return rod
 
@@ -225,7 +233,9 @@ def build_shelf():
     base_necks = [(nc, BASE_KNUCKLE_W + 2 * ACLR) for nc in NECK_XS]
     run = (W - ROD_R - CR) - (ROD_R + CR)
     rise = (SHELF_H - ROD_R - CR) - (ROD_R + CR)
-    shelf = _necked_rod(HBY, ROD_R + CR, W - ROD_R - CR, base_necks)  # bottom (hinge pins)
+    # Bottom rod is a ROUND Ø7 hinge rod (KNUCK_R): being a circle tangent to the bed it rotates
+    # up with the shelf without its corner dipping below the table (a flattened rod would).
+    shelf = _necked_rod(HBY, ROD_R + CR, W - ROD_R - CR, base_necks, r=KNUCK_R)
     shelf = shelf.fuse(_xcyl(ROD_R, run, ROD_R + CR, SHELF_H - ROD_R, ZC))  # top
     shelf = shelf.fuse(_ycyl(ROD_R, rise, ROD_R, ROD_R + CR, ZC))  # left
     shelf = shelf.fuse(_ycyl(ROD_R, rise, W - ROD_R, ROD_R + CR, ZC))  # right
@@ -236,36 +246,53 @@ def build_shelf():
 
     shelf = shelf.fuse(_necked_rod(CROSS_Y, ROD_R, W - ROD_R, [(LEG_CX, LEG_W + 2 * ACLR)]))
 
+    # 47/47 at the base-rail crossings: the base rails pass under the shelf crossmember, so the
+    # crossmember keeps only its UPPER band (Z[SPLIT_HIGH, T]) in the two base-rail bands.
+    for nc in NECK_XS:
+        shelf = shelf.cut(
+            _box(
+                nc - ROD_R - 1.0,
+                CROSS_Y - ROD_R - 1.0,
+                -1.0,
+                2 * ROD_R + 2.0,
+                2 * ROD_R + 2.0,
+                SPLIT_HIGH + 1.0,
+            )
+        )
+
     shelf = _flat(shelf)  # flatten the rods to the 7 mm cross-section
     shelf = shelf.fuse(_tray_lip())  # the lip rises above the part plane (not flattened)
     return shelf
 
 
-def _lock_cradle():
-    """Return a snap cradle spanning the base inner width: raised concave seat + ramp gusset.
+def _lock_cradle(nc):
+    """Return one snap cradle on a base rail at ``x = nc``, flanking (not under) the prop leg.
 
-    A boss across the base (between the side rails) with a concave seat (open toward the hinge)
-    that the prop leg's wide end cylinder clicks into, ramped on the foot side down to the base
-    surface before the rear rod.
+    A boss with a concave seat (open toward the hinge) that the prop leg's wide end cylinder
+    clicks into, ramped on the foot side down to the base surface before the rear rod. Two of
+    these sit on the two rails, outside the leg-body width, so the flat-printed leg never lies
+    over a raised cradle.
     """
-    x0 = NECK_XS[0]
-    span = NECK_XS[1] - NECK_XS[0]
-    boss = _box(x0, BASE_CROSS_Y - ROD_R - 1.0, T, span, 2 * ROD_R + 2.0, ROD_R)
-    seat = _xcyl(ROD_R + cfg.ALT_SNAP_CLEAR, span + 2.0, x0 - 1.0, BASE_CROSS_Y, T + ROD_R)
+    half = BASE_KNUCKLE_W / 2.0
+    x0 = nc - half
+    boss = _box(x0, BASE_CROSS_Y - ROD_R - 1.0, T, BASE_KNUCKLE_W, 2 * ROD_R + 2.0, ROD_R)
+    seat = _xcyl(
+        ROD_R + cfg.ALT_SNAP_CLEAR, BASE_KNUCKLE_W + 2.0, x0 - 1.0, BASE_CROSS_Y, T + ROD_R
+    )
     cradle = boss.cut(seat)
     ramp_y0 = BASE_CROSS_Y + ROD_R + 1.0
-    ramp = _yz_prism([(ramp_y0, T), (BASE_BACK_Y, T), (ramp_y0, T + ROD_R)], x0, span)
+    ramp = _yz_prism([(ramp_y0, T), (BASE_BACK_Y, T), (ramp_y0, T + ROD_R)], x0, BASE_KNUCKLE_W)
     return cradle.fuse(ramp)
 
 
 def _base_knuckle(nc):
-    """Return one base hinge knuckle: an X-cylinder at the hinge axis, bored for the shelf pin.
+    """Return one base hinge knuckle: a ROUND Ø7 X-cylinder at the hinge axis, bored for the pin.
 
-    Centred on a side rail at ``x = nc``, ``Y = HBY``; the rail merges into it. Bored to
-    ``BORE`` so it rides the shelf bottom-rod pin (a print-in-place hinge along ``X``).
+    Centred on a side rail at ``x = nc``, ``Y = HBY``; the rail merges into it. Round (``KNUCK_R``)
+    so it rotates cleanly on the shelf bottom-rod pin (a print-in-place hinge along ``X``).
     """
     x0 = nc - BASE_KNUCKLE_W / 2.0
-    knuckle = _xcyl(ROD_R, BASE_KNUCKLE_W, x0, HBY, ZC)
+    knuckle = _xcyl(KNUCK_R, BASE_KNUCKLE_W, x0, HBY, ZC)
     return knuckle.cut(_xcyl(BORE, BASE_KNUCKLE_W + 2.0, x0 - 1.0, HBY, ZC))
 
 
@@ -299,8 +326,28 @@ def build_base():
     # Print-in-place hinge knuckles at the axis (Y = HBY), between the foot and the frame.
     base = base.fuse(_base_knuckle(NECK_XS[0])).fuse(_base_knuckle(NECK_XS[1]))
 
+    # 47/47 crossings (base keeps the LOWER band Z[0, SPLIT_LOW]):
+    #  - base rails pass under the shelf crossmember (at NECK_XS, Y = CROSS_Y);
+    #  - the rear-foot rod passes under the prop leg (centre, Y = yb).
+    for nc in NECK_XS:
+        base = base.cut(
+            _box(
+                nc - ROD_R - 1.0,
+                CROSS_Y - ROD_R - 1.0,
+                SPLIT_LOW,
+                2 * ROD_R + 2.0,
+                2 * ROD_R + 2.0,
+                T,
+            )
+        )
+    base = base.cut(
+        _box(
+            LEG_CX - LEG_W / 2.0 - 1.0, yb - ROD_R - 1.0, SPLIT_LOW, LEG_W + 2.0, 2 * ROD_R + 2.0, T
+        )
+    )
+
     base = _flat(base)
-    base = base.fuse(_lock_cradle())
+    base = base.fuse(_lock_cradle(NECK_XS[0])).fuse(_lock_cradle(NECK_XS[1]))
     return base
 
 
@@ -314,12 +361,16 @@ def build_leg():
     """
     x0 = LEG_CX - LEG_W / 2.0
     tip_y = CROSS_Y + L_LEG
+    yb = BASE_BACK_Y - ROD_R  # base rear-rod centreline (the leg crosses over it)
     bar = _box(x0, CROSS_Y, 0.0, LEG_W, L_LEG, T)
-    leg = bar.fuse(_xcyl(ROD_R, LEG_W, x0, CROSS_Y, ZC))  # rounded hinge end
+    # Round Ø7 hinge knuckle centred on the crossmember pin, so it rotates clear of the lip.
+    leg = bar.fuse(_xcyl(KNUCK_R, LEG_W, x0, CROSS_Y, ZC))
     leg = leg.cut(_xcyl(BORE, LEG_W + 2.0, x0 - 1.0, CROSS_Y, ZC))  # pin hole through both
     leg = leg.fuse(_xcyl(ROD_R, BASE_X1 - BASE_X0, BASE_X0, tip_y, ZC))  # base-width end cylinder
-    # The end cylinder snaps into the base cradle; no 47/47 split — the leg ends in the cradle
-    # rather than crossing a base crossmember.
+    # 47/47: the leg passes over the base rear-foot rod, so keep only the UPPER band there.
+    leg = leg.cut(
+        _box(x0 - 1.0, yb - ROD_R - 1.0, -1.0, LEG_W + 2.0, 2 * ROD_R + 2.0, SPLIT_HIGH + 1.0)
+    )
     return _flat(leg)
 
 

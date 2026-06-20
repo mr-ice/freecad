@@ -38,6 +38,11 @@ ALT_B_BASE = ALT_S_HINGES * math.cos(ALT_THETA) + math.sqrt(
 
 ALT_LIP_EDGE_H = cfg.ALT_LIP_EDGE_FRAC * WALL_TOP  # deep-lip height at the shelf edges
 
+# Shelf length: tall enough that the folded leg end cylinder nests under the top rod with
+# clearance (leg hinge at ALT_CROSS_Y, leg end cylinder of radius ALT_ROD_R, top rod inner
+# edge another ALT_ROD_R down): ALT_CROSS_Y + L_LEG + ALT_ROD_R(end) + 2*ALT_ROD_R(top) + gap.
+ALT_SHELF_HEIGHT = ALT_CROSS_Y + cfg.ALT_LEG_LENGTH + 3 * cfg.ALT_ROD_R + cfg.ALT_LEG_TOP_GAP
+
 
 def cg_offset(l_cg, t_cg):
     """Return the horizontal depth of a slab CG behind the bottom hinge (mm; +behind/back).
@@ -69,5 +74,5 @@ def stand_is_stable():
 
 # --- Folded envelope (tabletop-base design) ---------------------------------
 ALT_FOLDED_W = ALT_SHELF_W
-ALT_FOLDED_L = cfg.ALT_BASE_FWD + max(cfg.ALT_SHELF_HEIGHT, ALT_B_BASE + cfg.ALT_BASE_FOOT)
+ALT_FOLDED_L = cfg.ALT_BASE_FWD + max(ALT_SHELF_HEIGHT, ALT_B_BASE + cfg.ALT_BASE_FOOT)
 ALT_FOLDED_H = cfg.ALT_PART_T + cfg.ALT_PART_T + ALT_LIP_EDGE_H  # base + shelf + lip proud

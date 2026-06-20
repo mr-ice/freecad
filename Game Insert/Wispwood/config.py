@@ -124,7 +124,9 @@ ALT_DIVOT_Z = 20.0  # divot height up the tray front face (Z)
 SHOW_ALT_STAND = True
 ALT_SHELF_THICKNESS = 7.0  # shelf plate thickness (the leg nests fully inside this, not the lips)
 ALT_SHELF_SIDE_CLEAR = 0.1  # per-side gap between the tray and the side lips
-ALT_SHELF_HEIGHT = 89.0  # shelf length; raised one rod-diameter above the leg so it clears the top
+# Shelf length is DERIVED in derived.py so the folded leg always nests under the top rod with
+# clearance: ALT_SHELF_HEIGHT = ALT_CROSS_Y + ALT_LEG_LENGTH + 3*ALT_ROD_R + ALT_LEG_TOP_GAP.
+ALT_LEG_TOP_GAP = 1.5  # clearance between the folded leg end cylinder and the shelf top rod
 # Frame extension below the cross-lip, down toward the base. Deployed, the shelf sits 15 deg
 # off vertical, so this is the SLANT length along the angled frame (vertical drop = x*cos15).
 # ~15 mm puts the top of the lip ~18 mm (slant) above the table so the tray's front-top edge

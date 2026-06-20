@@ -57,6 +57,13 @@ def test_stand_cg_within_footprint():
     assert d.stand_is_stable()
 
 
+def test_leg_fits_under_top_rod():
+    """The derived shelf height keeps the folded leg end cylinder clear of the top rod."""
+    leg_end_top = d.ALT_CROSS_Y + cfg.ALT_LEG_LENGTH + cfg.ALT_ROD_R  # leg end cylinder outer Y
+    top_rod_inner = d.ALT_SHELF_HEIGHT - 2 * cfg.ALT_ROD_R  # top rod inner edge
+    assert leg_end_top + cfg.ALT_LEG_TOP_GAP <= top_rod_inner + 1e-9
+
+
 def test_folded_height_within_bound():
     """Verify folded stand height fits under the box-insert top tray."""
     assert d.ALT_FOLDED_H <= cfg.ALT_STAND_MAX_FOLDED_H
