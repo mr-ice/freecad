@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="560" font-family="Helvetica, Arial, sans-serif">
+  <style>
+    .tray   { fill:#cfe0ff; stroke:#3a66c4; stroke-width:2; opacity:0.85; }
+    .struct { fill:#e7d7b8; stroke:#9a7b35; stroke-width:2; }
+    .leg    { fill:none; stroke:#c9772a; stroke-width:6; stroke-linecap:round; }
+    .table  { stroke:#444; stroke-width:3; }
+    .plumb  { stroke:#d12; stroke-width:1.6; stroke-dasharray:5 4; }
+    .cg     { fill:#d12; }
+    .hinge  { fill:#fff; stroke:#222; stroke-width:1.6; }
+    .foot   { stroke:#1a8; stroke-width:3; }
+    .dim    { stroke:#777; stroke-width:1; }
+    .ttl    { font-size:17px; font-weight:bold; }
+    .lbl    { font-size:12px; fill:#222; }
+    .sm     { font-size:11px; fill:#555; }
+    .good   { fill:#178a3a; font-size:13px; font-weight:bold; }
+    .bad    { fill:#c1121f; font-size:13px; font-weight:bold; }
+  </style>
+
+  <text x="20" y="26" class="ttl">Wispwood stand — why a near-vertical load tips FORWARD (side view, ~to scale, lean 78°)</text>
+  <text x="20" y="46" class="sm">Tray = 183 mm long × 43 mm thick slab; it rests on its bottom-back edge (•). Its centre of gravity (red ●) sits slightly FORWARD of that edge, so it rotates forward unless something is under it in front.</text>
+
+  <!-- ============ Panel A: rear kickstand easel ============ -->
+  <g transform="translate(30,70)">
+    <text x="0" y="14" class="ttl" font-size="15">A. Rear kickstand (easel)</text>
+    <line class="table" x1="0" y1="410" x2="330" y2="410"/>
+    <!-- tray: back-bottom(160,410) back-top(220,126) front-top(154,112) front-bottom(94,396) -->
+    <polygon class="tray" points="160,410 220,126 154,112 94,396"/>
+    <!-- rear leg -->
+    <line class="leg" x1="192" y1="196" x2="280" y2="410"/>
+    <circle class="hinge" cx="192" cy="196" r="5"/>
+    <!-- pivot edge -->
+    <circle cx="160" cy="410" r="4.5" fill="#222"/>
+    <text x="150" y="430" class="lbl">pivot edge</text>
+    <!-- CG + plumb -->
+    <line class="plumb" x1="157" y1="261" x2="157" y2="440"/>
+    <circle class="cg" cx="157" cy="261" r="6"/>
+    <text x="120" y="255" class="lbl" fill="#d12">CG</text>
+    <!-- footprint bracket between pivot(160) and rear foot(280) -->
+    <line class="foot" x1="160" y1="450" x2="280" y2="450"/>
+    <text x="175" y="466" class="sm">support zone (behind pivot)</text>
+    <text x="0" y="496" class="bad">✗ CG is in front of the pivot — tips FORWARD;</text>
+    <text x="0" y="512" class="bad">   the rear leg is on the wrong side to stop it.</text>
+  </g>
+
+  <!-- ============ Panel C: splayed twin rear legs ============ -->
+  <g transform="translate(420,70)">
+    <text x="0" y="14" class="ttl" font-size="15">C. Splayed twin rear legs</text>
+    <line class="table" x1="0" y1="410" x2="330" y2="410"/>
+    <polygon class="tray" points="160,410 220,126 154,112 94,396"/>
+    <line class="leg" x1="192" y1="196" x2="280" y2="410"/>
+    <circle class="hinge" cx="192" cy="196" r="5"/>
+    <circle cx="160" cy="410" r="4.5" fill="#222"/>
+    <line class="plumb" x1="157" y1="261" x2="157" y2="440"/>
+    <circle class="cg" cx="157" cy="261" r="6"/>
+    <text x="120" y="255" class="lbl" fill="#d12">CG</text>
+    <!-- plan inset: splay is in width (X), invisible from the side -->
+    <g transform="translate(8,300)">
+      <rect x="0" y="0" width="60" height="90" class="struct" opacity="0.5"/>
+      <text x="6" y="-6" class="sm">plan (top) view:</text>
+      <line class="leg" x1="30" y1="20" x2="2" y2="86"/>
+      <line class="leg" x1="30" y1="20" x2="58" y2="86"/>
+      <text x="0" y="104" class="sm">legs splay sideways</text>
+    </g>
+    <text x="0" y="496" class="bad">✗ Wide &amp; firm side-to-side, but the splay is</text>
+    <text x="0" y="512" class="bad">   sideways — still tips FORWARD, same as A.</text>
+  </g>
+
+  <!-- ============ Panel B: forward-reaching base (RECOMMENDED) ============ -->
+  <g transform="translate(820,70)">
+    <text x="0" y="14" class="ttl" font-size="15" fill="#178a3a">B. Forward-reaching base ★</text>
+    <line class="table" x1="0" y1="410" x2="380" y2="410"/>
+    <!-- base plate flat on table, extends in FRONT of the tray and back under it: x 55..250 -->
+    <rect class="struct" x="55" y="396" width="195" height="14"/>
+    <!-- tray sits on base top (y=396): back-bottom(150,396) back-top(210,112) front-top(144,98) front-bottom(84,382) -->
+    <polygon class="tray" points="150,396 210,112 144,98 84,382"/>
+    <!-- shelf hinge at back-bottom on the base -->
+    <circle class="hinge" cx="150" cy="396" r="5"/>
+    <!-- prop leg from shelf to a cradle on the base back -->
+    <line class="leg" x1="180" y1="254" x2="225" y2="396"/>
+    <circle class="hinge" cx="225" cy="396" r="4.5"/>
+    <text x="232" y="392" class="sm">snap cradle</text>
+    <!-- CG + plumb lands inside base -->
+    <line class="plumb" x1="147" y1="247" x2="147" y2="410"/>
+    <circle class="cg" cx="147" cy="247" r="6"/>
+    <text x="108" y="240" class="lbl" fill="#d12">CG</text>
+    <!-- footprint bracket = whole base -->
+    <line class="foot" x1="55" y1="430" x2="250" y2="430"/>
+    <text x="92" y="446" class="sm">support zone spans the CG</text>
+    <!-- forward reach dim -->
+    <line class="dim" x1="55" y1="382" x2="84" y2="382"/>
+    <text x="34" y="375" class="sm">forward foot</text>
+    <text x="0" y="496" class="good">✓ Flat base reaches FORWARD past the tray face,</text>
+    <text x="0" y="512" class="good">   so the CG sits over it — no tip, no rock.</text>
+  </g>
+
+  <!-- legend -->
+  <g transform="translate(30,536)">
+    <circle class="cg" cx="6" cy="-4" r="5"/><text x="16" y="0" class="sm">centre of gravity</text>
+    <line class="plumb" x1="150" y1="-4" x2="178" y2="-4"/><text x="184" y="0" class="sm">plumb (gravity)</text>
+    <line class="foot" x1="300" y1="-4" x2="330" y2="-4"/><text x="336" y="0" class="sm">support zone on table</text>
+    <circle class="hinge" cx="470" cy="-4" r="5"/><text x="482" y="0" class="sm">print-in-place hinge</text>
+    <line class="leg" x1="610" y1="-4" x2="640" y2="-4"/><text x="648" y="0" class="sm">fold-out prop leg</text>
+  </g>
+</svg>
