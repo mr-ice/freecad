@@ -71,40 +71,6 @@ GRIP_SLOT_WIDTH = 9.0  # stadium width (across the slot)
 GRIP_SLOT_LENGTH = 22.0  # stadium length end-to-end (along the diagonal)
 GRIP_SLOT_ANGLE = -60.0  # slot tilt above horizontal (deg)
 
-# --- Folding stand -----------------------------------------------------------
-# Two legs (rounded free ends) joined by a front base panel a little wider than the box
-# front so it covers the legs; the leg/base junction is chamfered. Each leg carries a
-# substantial oval peg that rides a complex slot in the tray's outer side wall. Modelled
-# FOLDED; the path/lock still need tuning vs a print.
-STAND_THICKNESS = 3.0  # leg and base-panel thickness
-# Single knob for the deployed tilt / balance: longer legs reach further back and lift the
-# raised end higher, moving the assembly's centre of gravity UP and BACK. The whole stand
-# slot (folded peg rest, vertex/hinge, jog, lock) is derived from STAND_LEG_LEN in
-# wispwood.py, so changing this fraction moves the leg AND the slot together and they stay
-# aligned (the peg's back margin stays constant). Stays in-bounds through ~0.7; tune to taste.
-STAND_LEG_LENGTH_FRAC = 0.6  # fraction of the tray length spanned by each leg
-STAND_LEG_WIDTH = 16.0  # leg width (Z extent), centred on the peg
-STAND_BASE_DEPTH = 8.0  # base-panel thickness along Y (the foot)
-STAND_CHAMFER = 5.0  # chamfer/gusset at the leg-to-base junction
-
-# Oval / bar peg on each leg (rides the slot) -- substantial, centred on the leg:
-STAND_PEG_LENGTH = 10.0  # oval major axis, along the leg
-STAND_PEG_WIDTH = 5.0  # oval minor axis (sets the slot channel width)
-STAND_PEG_DEPTH = 2.5  # how far the peg projects into the wall slot (< WALL_LONG)
-STAND_SLOT_CLEARANCE = 0.4  # slot-vs-peg running clearance
-# Gap between each leg's inner face and the tray outer wall, so the folded-modelled stand
-# does not print fused to the tray body. The peg still bridges this gap into the wall slot.
-STAND_BODY_GAP = 0.2
-
-# Slot path in the outer wall face, DERIVED from the leg so the oval sits at the back of
-# the leg with equal margins. The hinge is toward the FRONT. Path: along the horizontal
-# "parallel" arm to its end, a short vertical jog up (so the peg lifts before locking),
-# then a short tilted "top" arm to the lock. This jog+short-arm is the lock detent.
-STAND_SLOT_ARM_LEN = 24.0  # length of the horizontal (parallel) arm
-STAND_V_ANGLE_DEG = 15.0  # tilt of the top arm above horizontal
-STAND_JOG_FRAC = 0.5  # vertical jog at the vertex = this * peg width (the lift)
-STAND_ARM2_FRAC = 1.5  # top (lock) arm length = this * peg length (significantly shorter)
-
 # --- Alternate stand (separate, triangular frame: shelf + base + leg) --------
 # Fresh design. A triangular frame of three parts: the SHELF (holds the
 # tray on LIPs), the BASE (sits on the table), and the LEG (props them
@@ -228,10 +194,6 @@ MAX_PRINTER_DIMENSION = 350.0  # build-plate limit; XL bed (MK4 : 240, XL : 350)
 # Percent transparency (0 opaque .. 100 invisible) applied to the tray and lid parts so the
 # tiles, fit, and stand slot can be seen through them; other parts stay opaque.
 TRAY_LID_TRANSPARENCY = 80
-# A second, NON-PRINTING ghost copy of the stand posed at the slot's lock (deployed)
-# position, for visual comparison against the folded stand. Display-only -- do not export it.
-SHOW_STAND_DEPLOYED = True
-STAND_DEPLOYED_TRANSPARENCY = 55  # ghost transparency so it reads as a reference, not a part
 
 # --- Box insert --------------------------------------------------------------
 # The retail box holds the Wispwood tray plus the rest of the game. Flat cardboard

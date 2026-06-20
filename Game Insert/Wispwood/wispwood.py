@@ -19,12 +19,9 @@ Mechanism
   forming a stop that leaves a top-front **dispensing gap**. The large lid has a **reversible
   end cutout**: inserted cutout-end first it passes the stop and **closes the gap** (storage);
   reversed, it stops at the rail and **leaves the gap open**, so with the tray tilted/suspended
-  by the folding stand the front tile slides up and out through that gap into the user's hand.
-- A **folding stand** of two rounded-end legs (half the tray length) joined by a front
-  base panel that covers them (chamfered gussets at the junction). Each leg's oval peg
-  rides a slot in the tray side wall: along the horizontal **parallel arm** to the vertex
-  (hinge, toward the front), a short **jog up**, then a short tilted **top arm** to the
-  lock. Modelled folded.
+  by the separate stand the front tile slides up and out through that gap into the user's hand.
+- The tray is held upright by the separate rod-frame **stand** (see :mod:`stand`); it registers
+  on the stand via locating-peg **divots** in the tray's min-Y front face.
 
 Lid/slot fit (single source of truth)
 -------------------------------------
@@ -37,7 +34,7 @@ clean 45 deg overhang that prints without support (no downward-pointing lip).
 Public API
 ----------
 ``build_tray``, ``build_large_lid``, ``build_small_lid``, ``build_lid_slot_cutter``,
-``build_stand``, ``build_stand_deployed``, ``build_all``.
+``build_all``.
 
 All offsets are derived from named constants (never measured coordinates), per the
 repository rules.
@@ -84,31 +81,6 @@ LARGE_LID_Y1 = POCKET_Y0 + cfg.LID_SPLIT_TILE * cfg.TILE_THICKNESS
 POCKET_CENTRES_X = (
     (LEFT_POCKET_X0 + LEFT_POCKET_X1) / 2.0,
     (RIGHT_POCKET_X0 + RIGHT_POCKET_X1) / 2.0,
-)
-
-# Folding stand: leg geometry and the derived V-slot points (Y from front, Z from floor).
-# The leg is centred between the box top and bottom; the oval rests at the back of the leg
-# with equal top/bottom/back margins. The V vertex (hinge) points toward the FRONT, with
-# one arm horizontal (folded peg rest) and the other tilted up by STAND_V_ANGLE_DEG (lock).
-_STAND_VA = math.radians(cfg.STAND_V_ANGLE_DEG)
-STAND_LEG_LEN = OUTER_LENGTH * cfg.STAND_LEG_LENGTH_FRAC
-STAND_LEG_ZC = WALL_TOP / 2.0  # leg centred between the box top and bottom
-_STAND_MARGIN = (cfg.STAND_LEG_WIDTH - cfg.STAND_PEG_WIDTH) / 2.0  # equal margin
-# Folded rest at the back of the leg; horizontal arm runs forward to the vertex.
-STAND_FOLDED = (
-    STAND_LEG_LEN - _STAND_MARGIN - cfg.STAND_PEG_LENGTH / 2.0,
-    STAND_LEG_ZC,
-)
-STAND_VERTEX = (STAND_FOLDED[0] - cfg.STAND_SLOT_ARM_LEN, STAND_FOLDED[1])
-# Short vertical jog up (the lift), then the short tilted top arm to the lock.
-STAND_JOG_TOP = (
-    STAND_VERTEX[0],
-    STAND_VERTEX[1] + cfg.STAND_JOG_FRAC * cfg.STAND_PEG_WIDTH,
-)
-_STAND_ARM2 = cfg.STAND_ARM2_FRAC * cfg.STAND_PEG_LENGTH
-STAND_LOCK = (
-    STAND_JOG_TOP[0] + _STAND_ARM2 * math.cos(_STAND_VA),
-    STAND_JOG_TOP[1] + _STAND_ARM2 * math.sin(_STAND_VA),
 )
 
 
@@ -482,190 +454,6 @@ def build_small_lid():
     return _lid_prism(LARGE_LID_Y1, POCKET_Y1)
 
 
-# --- Folding stand -----------------------------------------------------------
-
-
-def _prism_yz(points_yz, x0, depth):
-    """Extrude a closed Y-Z profile along ``+X`` into a solid.
-
-    Parameters
-    ----------
-    points_yz : list of tuple of float
-        Profile vertices ``(y, z)`` in order; the polygon is auto-closed.
-    x0 : float
-        X of the profile plane (mm).
-    depth : float
-        Extrusion distance along ``+X`` (mm).
-
-    Returns
-    -------
-    Part.Shape
-        The extruded solid.
-    """
-    pts = [Vector(x0, y, z) for y, z in points_yz]
-    pts.append(pts[0])
-    face = Part.Face(Part.makePolygon(pts))
-    return face.extrude(Vector(depth, 0.0, 0.0))
-
-
-def _channel(p1, p2, width, x0, depth):
-    """Return a round-ended channel between two Y-Z points, extruded ``depth`` along X."""
-    (y1, z1), (y2, z2) = p1, p2
-    length = math.hypot(y2 - y1, z2 - z1)
-    uy, uz = (y2 - y1) / length, (z2 - z1) / length
-    ny, nz = -uz, uy  # unit normal in the Y-Z plane
-    hw = width / 2.0
-    rect = _prism_yz(
-        [
-            (y1 + ny * hw, z1 + nz * hw),
-            (y2 + ny * hw, z2 + nz * hw),
-            (y2 - ny * hw, z2 - nz * hw),
-            (y1 - ny * hw, z1 - nz * hw),
-        ],
-        x0,
-        depth,
-    )
-    cap1 = Part.makeCylinder(hw, depth, Vector(x0, y1, z1), Vector(1.0, 0.0, 0.0))
-    cap2 = Part.makeCylinder(hw, depth, Vector(x0, y2, z2), Vector(1.0, 0.0, 0.0))
-    return rect.fuse(cap1).fuse(cap2)
-
-
-def _oval_peg(y, z, x0, xlen):
-    """Return an oval/bar peg (stadium in Y-Z, major along Y) extruded ``xlen`` along X."""
-    hw = cfg.STAND_PEG_WIDTH / 2.0
-    half = cfg.STAND_PEG_LENGTH / 2.0 - hw
-    box = _prism_yz(
-        [
-            (y - half, z - hw),
-            (y + half, z - hw),
-            (y + half, z + hw),
-            (y - half, z + hw),
-        ],
-        x0,
-        xlen,
-    )
-    c1 = Part.makeCylinder(hw, xlen, Vector(x0, y - half, z), Vector(1.0, 0.0, 0.0))
-    c2 = Part.makeCylinder(hw, xlen, Vector(x0, y + half, z), Vector(1.0, 0.0, 0.0))
-    return box.fuse(c1).fuse(c2)
-
-
-def _stand_slot_cutter(x0, depth):
-    """Return the stand slot cutter for one long wall: parallel arm + jog + top arm.
-
-    Constant-width round-ended channels (no keyhole pockets): a horizontal "parallel" arm
-    (the folded peg rest, hinge end toward the front), a short vertical jog up at the
-    vertex (the peg lifts before locking), and a short tilted "top" arm to the lock.
-
-    Parameters
-    ----------
-    x0 : float
-        Inner X where the blind slot starts; it is cut ``depth`` further along ``+X``.
-    depth : float
-        Slot depth into the wall (mm).
-
-    Returns
-    -------
-    Part.Shape
-        The slot cutter solid.
-    """
-    width = cfg.STAND_PEG_WIDTH + cfg.STAND_SLOT_CLEARANCE
-    peg_half = cfg.STAND_PEG_LENGTH / 2.0
-    # Extend the horizontal arm past the folded rest (toward the back) so the oval is
-    # fully captured at rest.
-    folded_end = (STAND_FOLDED[0] + peg_half, STAND_FOLDED[1])
-    arm1 = _channel(STAND_VERTEX, folded_end, width, x0, depth)  # horizontal "parallel" arm
-    jog = _channel(STAND_VERTEX, STAND_JOG_TOP, width, x0, depth)  # short vertical lift
-    arm2 = _channel(STAND_JOG_TOP, STAND_LOCK, width, x0, depth)  # short tilted top arm
-    return arm1.fuse(jog).fuse(arm2)
-
-
-def _leg(x0):
-    """Return one leg (flush at ``x0``) with its free (back) end rounded to a half-circle."""
-    t, w, base_d = cfg.STAND_THICKNESS, cfg.STAND_LEG_WIDTH, cfg.STAND_BASE_DEPTH
-    zc = STAND_LEG_ZC
-    r = w / 2.0
-    back_y = STAND_LEG_LEN  # free end
-    straight = _box(x0, -base_d, zc - r, t, (back_y - r) - (-base_d), w)
-    cap = Part.makeCylinder(r, t, Vector(x0, back_y - r, zc), Vector(1.0, 0.0, 0.0))
-    return straight.fuse(cap)
-
-
-def _leg_base_gussets(x0):
-    """Return 45-degree chamfer gussets reinforcing one leg's junction with the base."""
-    t, w, ch = cfg.STAND_THICKNESS, cfg.STAND_LEG_WIDTH, cfg.STAND_CHAMFER
-    z_top, z_bot = STAND_LEG_ZC + w / 2.0, STAND_LEG_ZC - w / 2.0
-    top = _prism_yz([(0.0, z_top), (ch, z_top), (0.0, z_top + ch)], x0, t)
-    bottom = _prism_yz([(0.0, z_bot), (ch, z_bot), (0.0, z_bot - ch)], x0, t)
-    return top.fuse(bottom)
-
-
-def build_stand():
-    """Build the folding stand: two rounded-end legs + a base panel that covers them.
-
-    One springy U-shaped part. The base panel is a little wider than the box front so it
-    covers the legs, the leg/base junctions are chamfered with gussets, and each leg's free
-    end is rounded. Modelled folded (pegs at ``STAND_FOLDED``).
-
-    Returns
-    -------
-    Part.Shape
-        The stand solid.
-    """
-    t, base_d = cfg.STAND_THICKNESS, cfg.STAND_BASE_DEPTH
-    g = cfg.STAND_BODY_GAP
-    yf, zf = STAND_FOLDED
-
-    # Each leg is offset outward by the body gap so its inner face does not touch (and
-    # print fused to) the tray's outer wall. Inner faces land at x = -g and x = OUTER_WIDTH+g.
-    left_leg_x0 = -t - g
-    right_leg_x0 = OUTER_WIDTH + g
-    left_leg = _leg(left_leg_x0)
-    right_leg = _leg(right_leg_x0)
-    # Base panel: a little wider than the box front so it covers both (gapped) legs.
-    base = _box(left_leg_x0, -base_d, 0.0, (right_leg_x0 + t) - left_leg_x0, base_d, WALL_TOP)
-    gussets = _leg_base_gussets(left_leg_x0).fuse(_leg_base_gussets(right_leg_x0))
-    # Pegs project inward from each leg, bridging the gap and reaching STAND_PEG_DEPTH into
-    # the wall slot (which is cut from the wall outer face at x = 0 / x = OUTER_WIDTH).
-    left_peg = _oval_peg(yf, zf, -g, cfg.STAND_PEG_DEPTH + g)
-    right_peg = _oval_peg(yf, zf, OUTER_WIDTH - cfg.STAND_PEG_DEPTH, cfg.STAND_PEG_DEPTH + g)
-
-    return left_leg.fuse(right_leg).fuse(base).fuse(gussets).fuse(left_peg).fuse(right_peg)
-
-
-def build_stand_deployed():
-    """Return a NON-PRINTING copy of the stand posed at the slot's lock (second) position.
-
-    The oval peg's major axis is constrained to the slot-channel direction, so between the
-    folded rest (horizontal "parallel" arm) and the lock detent (tilted "top" arm) the rigid
-    body rotates by ``STAND_V_ANGLE_DEG`` about the peg axis (parallel to ``X``). This builds
-    the stand, rotates it by that angle about the peg axis through the folded peg centre,
-    then carries the peg centre to the seated lock position. It is a view-only reference for
-    comparing the folded and deployed poses -- not a part to print.
-
-    ``STAND_LOCK`` is the top arm's *centreline* end; the slot's rounded top (the end cap)
-    extends one detent radius further along the arm, so the seated peg centre is advanced by
-    that radius to sit at the true top of the detent.
-
-    Returns
-    -------
-    Part.Shape
-        The stand solid transformed to the lock position.
-    """
-    shape = build_stand()
-    fy, fz = STAND_FOLDED
-    # Advance the lock target by one detent radius along the top-arm direction so the peg
-    # seats at the rounded top of the slot (STAND_LOCK is the arm's centreline end).
-    arm_y, arm_z = math.cos(_STAND_VA), math.sin(_STAND_VA)  # top-arm unit dir in (Y, Z)
-    detent_r = (cfg.STAND_PEG_WIDTH + cfg.STAND_SLOT_CLEARANCE) / 2.0
-    ly = STAND_LOCK[0] + detent_r * arm_y
-    lz = STAND_LOCK[1] + detent_r * arm_z
-    # Rotate about the peg axis (parallel to X) through the folded peg centre, so the oval
-    # aligns with the top arm, then carry the peg centre to the seated lock position.
-    shape.rotate(Vector(0.0, fy, fz), Vector(1.0, 0.0, 0.0), cfg.STAND_V_ANGLE_DEG)
-    shape.translate(Vector(0.0, ly - fy, lz - fz))
-    return shape
-
-
 def build_all():
     """Build every part in assembled position, ready to add to a document.
 
@@ -676,8 +464,8 @@ def build_all():
         ``transparency`` is a view-only percent (0 opaque .. 100 invisible). The tray and
         lids are made ``TRAY_LID_TRANSPARENCY`` so the tiles/fit show through; the rest are
         opaque. ``LidSlotCutter`` is the (hidden) tool used to cut the tray's lid slot,
-        exposed for inspection. The integrated folding stand has been retired in favour of
-        the separate stand (see ``alt_stand``); its builders remain below but are unused.
+        exposed for inspection. The tray is held upright by the separate stand (see
+        :mod:`stand`); the retired integrated folding stand lives in ``archive/folding_stand.py``.
     """
     tlt = cfg.TRAY_LID_TRANSPARENCY
     parts = [
