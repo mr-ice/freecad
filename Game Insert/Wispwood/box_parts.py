@@ -299,12 +299,12 @@ def _pocket_cutter(solid, top_z, clr):
     return cut
 
 
-def _footprint_face(solid):
-    """Return ``solid``'s footprint as a filled outer-perimeter FACE (or None).
+def _footprint_prism(solid):
+    """Return a thin solid of ``solid``'s footprint at Z=0 (or None).
 
     Sections the solid with a thin slab at mid-thickness (so round rods/ears -- whose flat bottom
-    is only a tangent line -- are captured at full width), then fills the largest horizontal
-    section face to its outer perimeter.
+    is only a tangent line -- are captured at full width), fills the largest section face to its
+    outer perimeter, and re-extrudes it as a thin prism at Z=0 for robust union with other parts.
     """
     bb = solid.BoundBox
     z = bb.ZMin + cfg.ALT_PART_T / 2.0
@@ -313,35 +313,40 @@ def _footprint_face(solid):
     horiz = [f for f in sect.Faces if f.BoundBox.ZLength < 0.01]
     if not horiz:
         return None
-    return Part.Face(max(horiz, key=lambda f: f.Area).OuterWire)
+    face = Part.Face(max(horiz, key=lambda f: f.Area).OuterWire)
+    face.translate(Vector(0.0, 0.0, -face.BoundBox.ZMin))  # to Z=0
+    return face.extrude(Vector(0.0, 0.0, 1.0))
 
 
 def _stand_silhouette(grow):
     """Return the combined shelf+base outer outline as a grown FACE (rounded corners preserved).
 
-    Each part's footprint (from :func:`_footprint_face`) follows the actual rod outlines; fusing
-    the shelf and base fills the gap between them, and the union's outer boundary -- offset
-    outward by ``grow`` -- is the closed, fillet-following outline the folded stand drops into.
+    Each part's footprint prism follows its actual rod outlines; the prisms are FUSED into one
+    solid (filling the gap between the parts) and merged with ``removeSplitter`` so the whole
+    union becomes a single region, whose bottom outer wire -- offset outward by ``grow`` -- is the
+    closed, fillet-following outline the folded stand drops into.
     """
     ox, oy, oz = STAND_OFFSET
-    foots = []
+    solid = None
     for name, shape, *_rest in st.build_all():
         if name not in ("StandShelf", "StandBase"):
             continue
         shape.translate(Vector(ox - st.DISPLAY_X_OFFSET, oy, oz))
-        f = _footprint_face(shape)
-        if f is not None:
-            foots.append(f)
-    if not foots:
+        prism = _footprint_prism(shape)
+        if prism is not None:
+            solid = prism if solid is None else solid.fuse(prism)
+    if solid is None:
         return None
-    region = foots[0]
-    for f in foots[1:]:
-        region = region.fuse(f)
-    outer = Part.Face(max(region.Faces, key=lambda f: f.Area).OuterWire)
+    solid = solid.removeSplitter()
+    zmin = solid.BoundBox.ZMin
+    bottoms = [f for f in solid.Faces if abs(f.CenterOfMass.z - zmin) < 0.01]
+    outer = Part.Face(max(bottoms, key=lambda f: f.Area).OuterWire)
     try:
-        return outer.makeOffset2D(grow)
+        outer = outer.makeOffset2D(grow)
     except Exception:
-        return outer
+        pass
+    outer.translate(Vector(0.0, 0.0, oz - outer.BoundBox.ZMin))  # to the stand's resting Z
+    return outer
 
 
 def build_bottom_tray(components, stand_sil):
