@@ -306,39 +306,35 @@ def build_all():
         ``(name, shape, (r, g, b), visible, transparency)``.
     """
     fz = cfg.INSERT_FLOOR  # bottom contents sit on the bottom-tray floor
-    parts = [("BottomTray", build_bottom_tray(), (0.55, 0.6, 0.6), True, 70)]
-    # --- Bottom layer (on the tray floor), clear of the stand bay (X < ~93, Y 88..202) ---------
-    parts.append(_placed("Cards", build_cards(), 96.0, 90.0, fz, (0.85, 0.75, 0.45), rot=90.0))
-    parts.append(_placed("CatTokensx6", build_cats(), 10.0, 210.0, fz, (0.70, 0.50, 0.80)))
-    parts.append(_placed("SoloTokensx8", build_solo_tokens(), 56.0, 210.0, fz, (0.55, 0.55, 0.85)))
-
-    # --- Top layer (fit-check): board + markers in the top-tray pockets, paw + pad loose on top
     bt = cfg.BOARD_THICKNESS
+    parts = [("BottomTray", build_bottom_tray(), (0.55, 0.6, 0.6), True, 70)]
+    # --- Bottom layer (on the tray floor) -----------------------------------------------------
+    # The outer-map stack lies at 116 deg, threading the gap between the stand's lip extensions;
+    # the center octagon sits on top of it. Drag to fine-tune against the folded stand.
+    parts.append(
+        _placed(
+            "MapOuterStack", build_outer_map_stack(), 8.0, 92.0, fz, (0.45, 0.65, 0.45), rot=116.0
+        )
+    )
+    parts.append(
+        _placed("MapCenter", build_center_map(), 35.0, 120.0, fz + 4 * bt, (0.30, 0.55, 0.30))
+    )
+    parts.append(_placed("Cards", build_cards(), 96.0, 92.0, fz, (0.85, 0.75, 0.45), rot=90.0))
+    parts.append(_placed("CatTokensx6", build_cats(), 10.0, 212.0, fz, (0.70, 0.50, 0.80)))
+    parts.append(_placed("SoloTokensx8", build_solo_tokens(), 56.0, 212.0, fz, (0.55, 0.55, 0.85)))
+
+    # --- Top tray (markers + score pad in the two bays) + paw loose on top ---------------------
     tz = cfg.SMALL_TRAY_RIM_Z + cfg.INSERT_FLOOR  # top-tray pocket floor
     top = cfg.SMALL_TRAY_RIM_Z + cfg.TOP_TRAY_DEPTH  # top-tray rim (loose items rest here)
     bp = bl.top_regions()["board_pocket"]
     mt = bl.top_regions()["marker_trough"]
     parts.append(
-        _placed(
-            "MapOuterStack",
-            build_outer_map_stack(),
-            bp.x + 2.0,
-            bp.y + 2.0,
-            tz,
-            (0.45, 0.65, 0.45),
-            rot=90.0,
-        )
-    )
-    parts.append(
-        _placed(
-            "MapCenter", build_center_map(), bp.x + 2.0, bp.y + 2.0, tz + 4 * bt, (0.30, 0.55, 0.30)
-        )
+        _placed("ScorePad", build_scorepad(), bp.x + 2.0, bp.y + 2.0, tz, (0.80, 0.80, 0.60))
     )
     parts.append(
         _placed(
             "Markersx4", build_markers(), mt.x + 1.0, mt.y + 1.0, tz, (0.50, 0.75, 0.80), rot=90.0
         )
     )
-    parts.append(_placed("ScorePad", build_scorepad(), 5.0, 25.0, top, (0.80, 0.80, 0.60)))
-    parts.append(_placed("PawToken", build_paw(), 110.0, 25.0, top, (0.85, 0.55, 0.55)))
+    parts.append(_placed("PawToken", build_paw(), 130.0, 25.0, top, (0.85, 0.55, 0.55)))
     return parts
