@@ -267,11 +267,12 @@ def _solid_lower_box():
 
 
 def _pocket_cutter(solid, top_z, clr):
-    """Return a 'burn-down-from-the-top' cutter for ``solid``: its footprint up to ``top_z``.
+    """Return a 'router-from-the-top' cutter for ``solid``: its outer perimeter up to ``top_z``.
 
-    Takes the part's bottom face(s) (its footprint at its resting Z), grows them by ``clr``, and
-    extrudes them up through the top -- so subtracting it from the box leaves a part-shaped pocket
-    open at the top and bottomed where the part rests.
+    Takes only the OUTER boundary of the part's footprint (inner holes are filled -- a router
+    cutting from the top clears them, and any inner geometry would only occlude dropping the part
+    in), grows it by ``clr``, and extrudes it up through the top -- so subtracting it from the box
+    leaves a clean part-shaped pocket, open at the top and bottomed where the part rests.
     """
     bb = solid.BoundBox
     zmin = bb.ZMin
@@ -280,9 +281,14 @@ def _pocket_cutter(solid, top_z, clr):
     cut = None
     for f in faces:
         try:
-            face = f.makeOffset2D(clr) if clr else f
+            face = Part.Face(f.OuterWire)  # outer perimeter only (fill inner holes)
         except Exception:
             face = f
+        if clr:
+            try:
+                face = face.makeOffset2D(clr)
+            except Exception:
+                pass
         try:
             prism = face.extrude(up)
         except Exception:
