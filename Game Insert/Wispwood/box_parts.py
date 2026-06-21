@@ -423,18 +423,25 @@ def build_bottom_tray(components, stand_sil):
     r = bl.bottom_regions()["wispwood"]
     y0 = r.y + r.h + cfg.COMPONENT_CLEARANCE
     fr = cfg.FINGER_SCOOP_R
-    full_h = d.WALL_TOP + 1.0
-    box = box.cut(_stadium_cut(r.x + r.w / 2.0, y0, cfg.FINGER_SCOOP_SPAN, fr, -0.5, full_h))
-    # Retrieval scoops: one bridging the gap between the cards and solo tokens (spans Y between
-    # their pockets), one across the front end of the cat-token row.
+    # The front tray scoop cuts full depth (it lifts the whole Wispwood tray out).
+    box = box.cut(
+        _stadium_cut(r.x + r.w / 2.0, y0, cfg.FINGER_SCOOP_SPAN, fr, -0.5, d.WALL_TOP + 1.0)
+    )
+    # Retrieval scoops are SHALLOW (cut only the top FINGER_SCOOP_DEPTH off the rim) so the loose
+    # parts can't drop into them: one bridging the gap between the cards and solo tokens (spans Y
+    # between their pockets), one across the front end of the cat-token row.
+    sz = d.WALL_TOP - cfg.FINGER_SCOOP_DEPTH  # shallow-scoop floor
+    sh = cfg.FINGER_SCOOP_DEPTH + 1.0
     cards, solo, cats = bbs.get("Cards"), bbs.get("SoloTokensx8"), bbs.get("CatTokensx6")
     if cards is not None and solo is not None:
         gx = (max(cards.XMin, solo.XMin) + min(cards.XMax, solo.XMax)) / 2.0
         gy0, gy1 = min(cards.YMax, solo.YMax), max(cards.YMin, solo.YMin)
-        box = box.cut(_stadium_cut(gx, (gy0 + gy1) / 2.0, gy1 - gy0, fr, -0.5, full_h, axis="y"))
+        box = box.cut(_stadium_cut(gx, (gy0 + gy1) / 2.0, gy1 - gy0, fr, sz, sh, axis="y"))
     if cats is not None:
         cx = (cats.XMin + cats.XMax) / 2.0
-        box = box.cut(_stadium_cut(cx, cats.YMin, cats.XLength * 0.6, fr, -0.5, full_h))
+        # Keep the total X width (span + 2*r) within the cat bay so the cats stay seated.
+        cat_span = max(cats.XLength * 0.8 - 2.0 * fr, 0.0)
+        box = box.cut(_stadium_cut(cx, cats.YMin, cat_span, fr, sz, sh))
     if map_zmin is not None:  # support post in the stand window, holding up the map ends
         try:
             box = box.fuse(_support_post(map_zmin))

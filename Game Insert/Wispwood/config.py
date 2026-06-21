@@ -275,6 +275,9 @@ TOP_TRAY_FIT = 0.4  # per-side oversize of the top tray so it friction-fits and 
 FINGER_GROOVE_R = 8.0  # radius of the vertical finger grooves cut through the small-tray well walls
 FINGER_SCOOP_R = FINGER_GROOVE_R + 4.0  # finger-scoop end radius (Z depth kept; obround end caps)
 FINGER_SCOOP_SPAN = 50.0  # X distance between the two scoop end centres (box span between the caps)
+FINGER_SCOOP_DEPTH = (
+    12.0  # shallow retrieval-scoop depth from the rim (so parts can't drop into it)
+)
 SMALL_TRAY_RIM_Z = (
     FLOOR_THICKNESS + POCKET_DEPTH + LID_THICKNESS + LID_SLIDE_CLEARANCE + LID_TOP_LIP
 )  # = Wispwood WALL_TOP (~42.7); top tray rests flush on the Wispwood + small trays
