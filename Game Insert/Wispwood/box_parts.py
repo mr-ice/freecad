@@ -299,11 +299,34 @@ def _pocket_cutter(solid, top_z, clr):
     return cut
 
 
-def _part_silhouette(part_name, grow):
-    """Return one placed stand part's outer-perimeter FACE, grown outward by ``grow`` (or None).
+def _convex_hull(pts):
+    """Return the 2-D convex hull (CCW list of ``(x, y)``) of a set of points (monotone chain)."""
+    pts = sorted(set((round(x, 3), round(y, 3)) for x, y in pts))
+    if len(pts) < 3:
+        return pts
 
-    Unions the part's bottom faces (filled to their outer perimeter), takes the largest's outer
-    boundary, and offsets the FACE outward (reliable, unlike offsetting a bare wire).
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    lower = []
+    for p in pts:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(p)
+    upper = []
+    for p in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(p)
+    return lower[:-1] + upper[:-1]
+
+
+def _part_silhouette(part_name, grow):
+    """Return one placed stand part's outer outline as a grown FACE (or None).
+
+    The shelf bottom is two open cone-hinge ears, so its footprint outer wire is not a single
+    closed loop. To get a guaranteed-closed outline we take the 2-D convex hull of all the part's
+    vertices, build a closed face from it, and offset it outward by ``grow``.
     """
     ox, oy, oz = STAND_OFFSET
     for name, shape, *_rest in st.build_all():
@@ -311,21 +334,13 @@ def _part_silhouette(part_name, grow):
             continue
         shape.translate(Vector(ox - st.DISPLAY_X_OFFSET, oy, oz))
         zmin = shape.BoundBox.ZMin
-        foots = []
-        for f in shape.Faces:
-            if abs(f.CenterOfMass.z - zmin) < 0.1:
-                try:
-                    foots.append(Part.Face(f.OuterWire))
-                except Exception:
-                    foots.append(f)
-        if not foots:
+        hull = _convex_hull([(v.X, v.Y) for v in shape.Vertexes])
+        if len(hull) < 3:
             return None
-        region = foots[0]
-        for f in foots[1:]:
-            region = region.fuse(f)
-        face = Part.Face(max(region.Faces, key=lambda f: f.Area).OuterWire)
+        wire = Part.makePolygon([Vector(x, y, zmin) for x, y in hull] + [Vector(*hull[0], zmin)])
+        face = Part.Face(wire)
         try:
-            return face.makeOffset2D(grow)  # grow the FACE outward by `grow` on every side
+            return face.makeOffset2D(grow)  # grow the closed outline outward on every side
         except Exception:
             return face
     return None
