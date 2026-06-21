@@ -1,11 +1,11 @@
 """FreeCAD reference solids for the loose box components + the leftover-space block.
 
-Models the game components as reference solids at real size. The flat large bits (board
-sections, markers, paw, score pad) live in the kept **top tray** (see :mod:`box_insert`); this
-module focuses the rework on the **bottom** layer: :func:`build_lower_space` is the stock (box
-footprint minus the Wispwood tray, up to the tray top) and :func:`build_all` arranges the chunky
-bottom contents in it (cards, cats on edge, solo tokens). The folded stand also sits in this
-layer (placed by ``box_insert.place_stand``). The old small tray is retired.
+Models the game components as reference solids at real size and builds the **bottom organizer**
+by a subtractive method: start from a whole solid bottom box (:func:`_solid_lower_box`) and, for
+each part placed at its recorded position (``offsets.txt``), **burn a fitted pocket down from the
+top** (:func:`_pocket_cutter`) -- the leftover material forms the dividers. The markers + score
+pad stay in the kept **top tray** (see :mod:`box_insert`); the folded stand gets its own burned
+pocket. The old small tray is retired.
 
 Fungible multiples (solo tokens, cats, markers) are modelled as a single **stack** (the storage
 envelope) rather than separate pieces; the four outer map sections are separate objects. The
@@ -249,47 +249,82 @@ def build_lower_space():
     return block
 
 
-def build_bottom_tray():
-    """Return a first-pass bottom organizer tray over the back region.
-
-    A floor over the box-back region with **1.5 mm walls (``BOTTOM_TRAY_WALL``) on the three
-    sides not adjacent to the Wispwood tray** (left, right, back), rising to the tray top so they
-    support the top tray and form the tall back corners. The two back outer corners are rounded
-    to the box's interior radius so it drops in, and a **deep finger scoop** notches the open
-    front edge (centred on the Wispwood tray) to reach down and lift the tray out. The folded
-    stand and the bottom contents sit on the floor; component wells are a later step.
-    """
+def _solid_lower_box():
+    """Return the whole solid bottom box (back region, box-corner rounded) to carve pockets from."""
     r = bl.bottom_regions()["wispwood"]
     c = cfg.COMPONENT_CLEARANCE
     y0 = r.y + r.h + c  # front edge of the back region (facing the Wispwood tray)
-    depth = cfg.BOX_L - y0
-    wt = cfg.BOTTOM_TRAY_WALL
     rr = cfg.BOX_CORNER_R
-    h = d.WALL_TOP  # wall height = top-tray rest height
-    tray = _box(0.0, y0, 0.0, cfg.BOX_W, depth, cfg.INSERT_FLOOR)  # floor
-    tray = tray.fuse(_box(0.0, y0, 0.0, wt, depth, h))  # left wall
-    tray = tray.fuse(_box(cfg.BOX_W - wt, y0, 0.0, wt, depth, h))  # right wall
-    tray = tray.fuse(_box(0.0, cfg.BOX_L - wt, 0.0, cfg.BOX_W, wt, h))  # back wall
-    # Stand bay: dividers enclosing the folded stand (at STAND_OFFSET), on its right (+X) and
-    # back (+Y); the left outer wall and the open front (toward the Wispwood tray) complete it.
-    clr = cfg.STAND_BAY_CLEAR
-    dx = STAND_OFFSET[0] + st.W + clr  # right divider X
-    dy = STAND_OFFSET[1] + st.SHELF_H + clr  # back divider Y
-    tray = tray.fuse(_box(dx, y0, 0.0, wt, dy - y0, h))  # right divider (runs front to back)
-    tray = tray.fuse(
-        _box(0.0, dy, 0.0, dx + wt, wt, h)
-    )  # back divider (left wall to right divider)
-    # Round the two back outer corners to the box's interior radius (cut the sharp bit; works with
-    # thin walls where makeFillet would not fit).
+    h = d.WALL_TOP
+    box = _box(0.0, y0, 0.0, cfg.BOX_W, cfg.BOX_L - y0, h)
+    # Round the two back outer corners to the box's interior radius (cut the sharp bit).
     for cx in (0.0, cfg.BOX_W):
         ccx = cx + rr if cx == 0.0 else cx - rr
         sq_x = 0.0 if cx == 0.0 else cx - rr
         sq = _box(sq_x, cfg.BOX_L - rr, -1.0, rr, rr, h + 2.0)
-        tray = tray.cut(sq.cut(_zcyl(rr, h + 2.0, ccx, cfg.BOX_L - rr, -1.0)))
-    # Deep finger scoop in the open front edge, centred on the Wispwood tray, to lift the tray out.
-    sx = r.x + r.w / 2.0
-    tray = tray.cut(_zcyl(cfg.FINGER_GROOVE_R + 4.0, h + 1.0, sx, y0, -0.5))
-    return tray
+        box = box.cut(sq.cut(_zcyl(rr, h + 2.0, ccx, cfg.BOX_L - rr, -1.0)))
+    return box
+
+
+def _pocket_cutter(solid, top_z, clr):
+    """Return a 'burn-down-from-the-top' cutter for ``solid``: its footprint up to ``top_z``.
+
+    Takes the part's bottom face(s) (its footprint at its resting Z), grows them by ``clr``, and
+    extrudes them up through the top -- so subtracting it from the box leaves a part-shaped pocket
+    open at the top and bottomed where the part rests.
+    """
+    bb = solid.BoundBox
+    zmin = bb.ZMin
+    up = Vector(0.0, 0.0, top_z - zmin + 1.0)
+    faces = [f for f in solid.Faces if abs(f.CenterOfMass.z - zmin) < 0.1]
+    cut = None
+    for f in faces:
+        try:
+            face = f.makeOffset2D(clr) if clr else f
+        except Exception:
+            face = f
+        try:
+            prism = face.extrude(up)
+        except Exception:
+            continue
+        cut = prism if cut is None else cut.fuse(prism)
+    if cut is None:  # fallback: bounding-box prism
+        cut = _box(bb.XMin, bb.YMin, zmin, bb.XLength, bb.YLength, top_z - zmin + 1.0)
+    return cut
+
+
+def _placed_stand():
+    """Return the folded stand as one fused solid at ``STAND_OFFSET`` (for carving its pocket)."""
+    ox, oy, oz = STAND_OFFSET
+    solid = None
+    for _name, shape, *_rest in st.build_all():
+        shape.translate(Vector(ox - st.DISPLAY_X_OFFSET, oy, oz))
+        solid = shape if solid is None else solid.fuse(shape)
+    return solid
+
+
+def build_bottom_tray(components, stand_solid):
+    """Return the bottom box with a fitted pocket burned down from the top for every part.
+
+    Starts from the whole solid bottom box and subtracts each part's footprint (extruded from
+    its resting Z up through the top) -- the parts drop in from above and the leftover material
+    forms the dividers. Also cuts a deep front finger scoop to lift the Wispwood tray out.
+    """
+    box = _solid_lower_box()
+    for _name, shape, _rgb in components:
+        try:
+            box = box.cut(_pocket_cutter(shape, d.WALL_TOP, cfg.COMPONENT_CLEARANCE))
+        except Exception:
+            pass
+    if stand_solid is not None:
+        try:
+            box = box.cut(_pocket_cutter(stand_solid, d.WALL_TOP, cfg.STAND_BAY_CLEAR))
+        except Exception:
+            pass
+    r = bl.bottom_regions()["wispwood"]
+    y0 = r.y + r.h + cfg.COMPONENT_CLEARANCE
+    box = box.cut(_zcyl(cfg.FINGER_GROOVE_R + 4.0, d.WALL_TOP + 1.0, r.x + r.w / 2.0, y0, -0.5))
+    return box
 
 
 def _placed(name, shape, x, y, z, rgb, rot=0.0):
@@ -301,23 +336,47 @@ def _placed(name, shape, x, y, z, rgb, rot=0.0):
     return (name, shape, rgb, True, 0)
 
 
-def _place(name, shape, x, y, z, r, rgb):
-    """Apply a FreeCAD object placement: rotate ``r`` deg about the global Z origin, then translate.
+def _shape_at(shape, x, y, z, r):
+    """Return ``shape`` under a FreeCAD placement: rotate ``r`` deg about Z origin, then translate.
 
-    This reproduces the recorded manual positions in ``offsets.txt`` (the object's
-    ``Placement`` = a Z rotation about the origin plus a base translation).
+    Reproduces the recorded manual positions in ``offsets.txt`` (placement = Z rotation about the
+    origin + base translation).
     """
     if r:
         shape.rotate(Vector(0.0, 0.0, 0.0), Vector(0.0, 0.0, 1.0), r)
     shape.translate(Vector(x, y, z))
-    return (name, shape, rgb, True, 0)
+    return shape
 
 
-def _place_center(name, shape, cx, cy, z, rgb):
-    """Place a shape by its bbox centre in XY at ``(cx, cy)`` with its bottom at ``z``."""
+def _shape_centered(shape, cx, cy, z):
+    """Return ``shape`` with its bbox centre in XY at ``(cx, cy)`` and its bottom at ``z``."""
     bb = shape.BoundBox
     shape.translate(Vector(cx - bb.Center.x, cy - bb.Center.y, z - bb.ZMin))
-    return (name, shape, rgb, True, 0)
+    return shape
+
+
+def _bottom_components():
+    """Return the bottom-layer parts as ``(name, placed_solid, rgb)`` at the recorded positions."""
+    return [
+        (
+            "MapOuterStack",
+            _shape_at(build_outer_map_stack(), 101.042, 282.206, 31.600, 232.0),
+            (0.45, 0.65, 0.45),
+        ),
+        (
+            "MapCenter",
+            _shape_centered(build_center_map(), 120.162, 200.262, 40.532),
+            (0.30, 0.55, 0.30),
+        ),
+        ("Cards", _shape_at(build_cards(), 119.800, 88.500, 33.000, 0.0), (0.85, 0.75, 0.45)),
+        ("PawToken", _shape_at(build_paw(), 60.200, 176.500, 29.200, 0.0), (0.85, 0.55, 0.55)),
+        ("CatTokensx6", _shape_at(build_cats(), 13.300, 223.200, 5.800, 0.0), (0.70, 0.50, 0.80)),
+        (
+            "SoloTokensx8",
+            _shape_at(build_solo_tokens(), 151.400, 216.000, 23.300, 0.0),
+            (0.55, 0.55, 0.85),
+        ),
+    ]
 
 
 def build_all():
@@ -333,32 +392,12 @@ def build_all():
     list of tuple
         ``(name, shape, (r, g, b), visible, transparency)``.
     """
-    parts = [("BottomTray", build_bottom_tray(), (0.55, 0.6, 0.6), True, 70)]
-    # --- Bottom layer: recorded manual positions (offsets.txt) --------------------------------
-    parts.append(
-        _place(
-            "MapOuterStack",
-            build_outer_map_stack(),
-            101.042,
-            282.206,
-            31.600,
-            232.0,
-            (0.45, 0.65, 0.45),
-        )
-    )
-    parts.append(
-        _place_center("MapCenter", build_center_map(), 120.162, 200.262, 40.532, (0.30, 0.55, 0.30))
-    )
-    parts.append(_place("Cards", build_cards(), 119.800, 88.500, 33.000, 0.0, (0.85, 0.75, 0.45)))
-    parts.append(_place("PawToken", build_paw(), 60.200, 176.500, 29.200, 0.0, (0.85, 0.55, 0.55)))
-    parts.append(
-        _place("CatTokensx6", build_cats(), 13.300, 223.200, 5.800, 0.0, (0.70, 0.50, 0.80))
-    )
-    parts.append(
-        _place(
-            "SoloTokensx8", build_solo_tokens(), 151.400, 216.000, 23.300, 0.0, (0.55, 0.55, 0.85)
-        )
-    )
+    comps = _bottom_components()
+    tray = build_bottom_tray(comps, _placed_stand())
+    parts = [("BottomTray", tray, (0.55, 0.6, 0.6), True, 30)]
+    # Show the seated parts in their burned-down pockets.
+    for name, shape, rgb in comps:
+        parts.append((name, shape, rgb, True, 0))
 
     # --- Top tray: markers + score pad in the two bays (not in offsets.txt) --------------------
     tz = cfg.SMALL_TRAY_RIM_Z + cfg.INSERT_FLOOR  # top-tray pocket floor
