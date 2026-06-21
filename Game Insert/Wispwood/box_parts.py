@@ -248,37 +248,34 @@ def build_lower_space():
 def build_bottom_tray():
     """Return a first-pass bottom organizer tray over the back region.
 
-    A floor over the box-back region (filleted to the box's rounded corners), with **tall
-    corner posts at the two back corners** (rising to the tray top to support the top tray over
-    the bottom layer), and a **deep finger scoop** in the front edge, centred on the Wispwood
-    tray, so a finger can reach down beside it and lift it out. The folded stand and the bottom
-    contents (cards, cats, tokens) sit on the floor; component wells are a later step.
+    A floor over the box-back region with **1.5 mm walls (``BOTTOM_TRAY_WALL``) on the three
+    sides not adjacent to the Wispwood tray** (left, right, back), rising to the tray top so they
+    support the top tray and form the tall back corners. The two back outer corners are rounded
+    to the box's interior radius so it drops in, and a **deep finger scoop** notches the open
+    front edge (centred on the Wispwood tray) to reach down and lift the tray out. The folded
+    stand and the bottom contents sit on the floor; component wells are a later step.
     """
     r = bl.bottom_regions()["wispwood"]
     c = cfg.COMPONENT_CLEARANCE
     y0 = r.y + r.h + c  # front edge of the back region (facing the Wispwood tray)
-    post = 20.0  # back support-post footprint
-    tray = _box(0.0, y0, 0.0, cfg.BOX_W, cfg.BOX_L - y0, cfg.INSERT_FLOOR)  # floor
-    for px in (0.0, cfg.BOX_W - post):  # tall back corner posts to the top-tray rest height
-        tray = tray.fuse(_box(px, cfg.BOX_L - post, 0.0, post, post, d.WALL_TOP))
-    # Fillet the two back vertical outer corners (the box's rounded interior corners).
-    corners = [
-        e
-        for e in tray.Edges
-        if e.BoundBox.ZLength > d.WALL_TOP - 1.0
-        and e.BoundBox.XLength < 0.5
-        and e.BoundBox.YLength < 0.5
-        and abs(e.BoundBox.YMax - cfg.BOX_L) < 0.5
-        and (abs(e.BoundBox.XMin) < 0.5 or abs(e.BoundBox.XMax - cfg.BOX_W) < 0.5)
-    ]
-    if corners:
-        try:
-            tray = tray.makeFillet(cfg.BOX_CORNER_R, corners)
-        except Exception:
-            pass
-    # Deep finger scoop in the front edge, centred on the Wispwood tray, to lift the tray out.
+    depth = cfg.BOX_L - y0
+    wt = cfg.BOTTOM_TRAY_WALL
+    rr = cfg.BOX_CORNER_R
+    h = d.WALL_TOP  # wall height = top-tray rest height
+    tray = _box(0.0, y0, 0.0, cfg.BOX_W, depth, cfg.INSERT_FLOOR)  # floor
+    tray = tray.fuse(_box(0.0, y0, 0.0, wt, depth, h))  # left wall
+    tray = tray.fuse(_box(cfg.BOX_W - wt, y0, 0.0, wt, depth, h))  # right wall
+    tray = tray.fuse(_box(0.0, cfg.BOX_L - wt, 0.0, cfg.BOX_W, wt, h))  # back wall
+    # Round the two back outer corners to the box's interior radius (cut the sharp bit; works with
+    # thin walls where makeFillet would not fit).
+    for cx in (0.0, cfg.BOX_W):
+        ccx = cx + rr if cx == 0.0 else cx - rr
+        sq_x = 0.0 if cx == 0.0 else cx - rr
+        sq = _box(sq_x, cfg.BOX_L - rr, -1.0, rr, rr, h + 2.0)
+        tray = tray.cut(sq.cut(_zcyl(rr, h + 2.0, ccx, cfg.BOX_L - rr, -1.0)))
+    # Deep finger scoop in the open front edge, centred on the Wispwood tray, to lift the tray out.
     sx = r.x + r.w / 2.0
-    tray = tray.cut(_zcyl(cfg.FINGER_GROOVE_R + 4.0, d.WALL_TOP + 1.0, sx, y0, -0.5))
+    tray = tray.cut(_zcyl(cfg.FINGER_GROOVE_R + 4.0, h + 1.0, sx, y0, -0.5))
     return tray
 
 
@@ -313,7 +310,7 @@ def build_all():
     # the center octagon sits on top of it. Drag to fine-tune against the folded stand.
     parts.append(
         _placed(
-            "MapOuterStack", build_outer_map_stack(), 8.0, 92.0, fz, (0.45, 0.65, 0.45), rot=116.0
+            "MapOuterStack", build_outer_map_stack(), 8.0, 92.0, fz, (0.45, 0.65, 0.45), rot=232.0
         )
     )
     parts.append(
