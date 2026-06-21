@@ -273,6 +273,8 @@ INSERT_FLOOR = 1.5  # tray floor thickness
 TOP_TRAY_DEPTH = 12.0  # top-tray height (board stack is the tallest content)
 TOP_TRAY_FIT = 0.4  # per-side oversize of the top tray so it friction-fits and covers the box ends
 FINGER_GROOVE_R = 8.0  # radius of the vertical finger grooves cut through the small-tray well walls
+FINGER_SCOOP_R = FINGER_GROOVE_R + 4.0  # finger-scoop end radius (Z depth kept; obround end caps)
+FINGER_SCOOP_SPAN = 50.0  # X distance between the two scoop end centres (box span between the caps)
 SMALL_TRAY_RIM_Z = (
     FLOOR_THICKNESS + POCKET_DEPTH + LID_THICKNESS + LID_SLIDE_CLEARANCE + LID_TOP_LIP
 )  # = Wispwood WALL_TOP (~42.7); top tray rests flush on the Wispwood + small trays
