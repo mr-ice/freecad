@@ -349,18 +349,49 @@ def _stand_silhouette(grow):
     return outer
 
 
+def _support_post(top_z):
+    """Return a rounded-rectangular support post from the box floor up to ``top_z``.
+
+    Sized to fit the folded stand's open window -- between the base hinge bar (``HBY``) and the
+    shelf crossmember / leg hinge (``CROSS_Y``), and between the base side rails (``NECK_XS``) --
+    with ``STAND_BAY_CLEAR`` all round so it slides through the stand. It rises through the stand
+    pocket to hold up the overhanging ends of the outer-map stack (which sit over this window).
+    """
+    ox, oy, _oz = STAND_OFFSET
+    clr = cfg.STAND_BAY_CLEAR
+    x0 = st.NECK_XS[0] + st.ROD_R + clr + ox
+    x1 = st.NECK_XS[1] - st.ROD_R - clr + ox
+    y0 = st.HBY + st.KNUCK_R + clr + oy
+    y1 = st.CROSS_Y - st.ROD_R - clr + oy
+    post = _box(x0, y0, 0.0, x1 - x0, y1 - y0, top_z)
+    vert = [
+        e
+        for e in post.Edges
+        if e.BoundBox.ZLength > top_z - 0.01
+        and e.BoundBox.XLength < 1e-6
+        and e.BoundBox.YLength < 1e-6
+    ]
+    if vert:
+        post = post.makeFillet(cfg.SUPPORT_POST_CORNER_R, vert)
+    return post
+
+
 def build_bottom_tray(components, stand_sil):
     """Return the bottom box with a fitted pocket burned down from the top for every part.
 
     Starts from the whole solid bottom box and subtracts each part's outer-perimeter footprint
     (extruded from its resting Z up through the top) -- the parts drop in from above and the
     leftover material forms the dividers. The stand uses its combined shelf+base silhouette
-    (``stand_sil``). Also cuts a deep front finger scoop to lift the Wispwood tray out.
+    (``stand_sil``). Also cuts a deep front finger scoop to lift the Wispwood tray out, and -- last,
+    so it survives the stand cut -- fuses a support post under the overhanging outer-map ends.
     """
     box = _solid_lower_box()
-    for _name, shape, _rgb in components:
+    map_zmin = None
+    for name, shape, _rgb in components:
+        if name == "MapOuterStack":
+            map_zmin = shape.BoundBox.ZMin
         try:
-            box = box.cut(_pocket_cutter(shape, d.WALL_TOP, cfg.COMPONENT_CLEARANCE))
+            box = box.cut(_pocket_cutter(shape, d.WALL_TOP, cfg.STAND_BAY_CLEAR))
         except Exception:
             pass
     if stand_sil is not None:  # combined shelf+base outline pocket
@@ -372,6 +403,11 @@ def build_bottom_tray(components, stand_sil):
     r = bl.bottom_regions()["wispwood"]
     y0 = r.y + r.h + cfg.COMPONENT_CLEARANCE
     box = box.cut(_zcyl(cfg.FINGER_GROOVE_R + 4.0, d.WALL_TOP + 1.0, r.x + r.w / 2.0, y0, -0.5))
+    if map_zmin is not None:  # support post in the stand window, holding up the map ends
+        try:
+            box = box.fuse(_support_post(map_zmin))
+        except Exception:
+            pass
     return box
 
 
