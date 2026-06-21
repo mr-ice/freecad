@@ -299,54 +299,52 @@ def _pocket_cutter(solid, top_z, clr):
     return cut
 
 
-def _convex_hull(pts):
-    """Return the 2-D convex hull (CCW list of ``(x, y)``) of a set of points (monotone chain)."""
-    pts = sorted(set((round(x, 3), round(y, 3)) for x, y in pts))
-    if len(pts) < 3:
-        return pts
+def _footprint_face(solid):
+    """Return ``solid``'s footprint as a filled outer-perimeter FACE (or None).
 
-    def cross(o, a, b):
-        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
-
-    lower = []
-    for p in pts:
-        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
-            lower.pop()
-        lower.append(p)
-    upper = []
-    for p in reversed(pts):
-        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
-            upper.pop()
-        upper.append(p)
-    return lower[:-1] + upper[:-1]
+    Sections the solid with a thin slab at mid-thickness (so round rods/ears -- whose flat bottom
+    is only a tangent line -- are captured at full width), then fills the largest horizontal
+    section face to its outer perimeter.
+    """
+    bb = solid.BoundBox
+    z = bb.ZMin + cfg.ALT_PART_T / 2.0
+    slab = _box(bb.XMin - 1.0, bb.YMin - 1.0, z - 0.5, bb.XLength + 2.0, bb.YLength + 2.0, 1.0)
+    sect = solid.common(slab)
+    horiz = [f for f in sect.Faces if f.BoundBox.ZLength < 0.01]
+    if not horiz:
+        return None
+    return Part.Face(max(horiz, key=lambda f: f.Area).OuterWire)
 
 
-def _part_silhouette(part_name, grow):
-    """Return one placed stand part's outer outline as a grown FACE (or None).
+def _stand_silhouette(grow):
+    """Return the combined shelf+base outer outline as a grown FACE (rounded corners preserved).
 
-    The shelf bottom is two open cone-hinge ears, so its footprint outer wire is not a single
-    closed loop. To get a guaranteed-closed outline we take the 2-D convex hull of all the part's
-    vertices, build a closed face from it, and offset it outward by ``grow``.
+    Each part's footprint (from :func:`_footprint_face`) follows the actual rod outlines; fusing
+    the shelf and base fills the gap between them, and the union's outer boundary -- offset
+    outward by ``grow`` -- is the closed, fillet-following outline the folded stand drops into.
     """
     ox, oy, oz = STAND_OFFSET
+    foots = []
     for name, shape, *_rest in st.build_all():
-        if name != part_name:
+        if name not in ("StandShelf", "StandBase"):
             continue
         shape.translate(Vector(ox - st.DISPLAY_X_OFFSET, oy, oz))
-        zmin = shape.BoundBox.ZMin
-        hull = _convex_hull([(v.X, v.Y) for v in shape.Vertexes])
-        if len(hull) < 3:
-            return None
-        wire = Part.makePolygon([Vector(x, y, zmin) for x, y in hull] + [Vector(*hull[0], zmin)])
-        face = Part.Face(wire)
-        try:
-            return face.makeOffset2D(grow)  # grow the closed outline outward on every side
-        except Exception:
-            return face
-    return None
+        f = _footprint_face(shape)
+        if f is not None:
+            foots.append(f)
+    if not foots:
+        return None
+    region = foots[0]
+    for f in foots[1:]:
+        region = region.fuse(f)
+    outer = Part.Face(max(region.Faces, key=lambda f: f.Area).OuterWire)
+    try:
+        return outer.makeOffset2D(grow)
+    except Exception:
+        return outer
 
 
-def build_bottom_tray(components, stand_sils):
+def build_bottom_tray(components, stand_sil):
     """Return the bottom box with a fitted pocket burned down from the top for every part.
 
     Starts from the whole solid bottom box and subtracts each part's outer-perimeter footprint
@@ -360,12 +358,10 @@ def build_bottom_tray(components, stand_sils):
             box = box.cut(_pocket_cutter(shape, d.WALL_TOP, cfg.COMPONENT_CLEARANCE))
         except Exception:
             pass
-    for sil in stand_sils:  # shelf + base outline pockets
-        if sil is None:
-            continue
+    if stand_sil is not None:  # combined shelf+base outline pocket
         try:
-            zmin = sil.BoundBox.ZMin
-            box = box.cut(sil.extrude(Vector(0.0, 0.0, d.WALL_TOP - zmin + 1.0)))
+            zmin = stand_sil.BoundBox.ZMin
+            box = box.cut(stand_sil.extrude(Vector(0.0, 0.0, d.WALL_TOP - zmin + 1.0)))
         except Exception:
             pass
     r = bl.bottom_regions()["wispwood"]
@@ -440,20 +436,15 @@ def build_all():
         ``(name, shape, (r, g, b), visible, transparency)``.
     """
     comps = _bottom_components()
-    shelf_sil = _part_silhouette("StandShelf", cfg.STAND_BAY_CLEAR)
-    base_sil = _part_silhouette("StandBase", cfg.STAND_BAY_CLEAR)
-    tray = build_bottom_tray(comps, [shelf_sil, base_sil])
+    stand_sil = _stand_silhouette(cfg.STAND_BAY_CLEAR)
+    tray = build_bottom_tray(comps, stand_sil)
     parts = [("BottomTray", tray, (0.55, 0.6, 0.6), True, 30)]
     # Show the seated parts in their burned-down pockets.
     for name, shape, rgb in comps:
         parts.append((name, shape, rgb, True, 0))
-    # Show the grown shelf + base outlines as wires for review.
-    for nm, sil, rgb in (
-        ("ShelfOutline", shelf_sil, (1.0, 0.0, 0.0)),
-        ("BaseOutline", base_sil, (1.0, 0.5, 0.0)),
-    ):
-        if sil is not None:
-            parts.append((nm, sil.OuterWire, rgb, True, 0))
+    # Show the combined shelf+base outline (grown) as a wire for review.
+    if stand_sil is not None:
+        parts.append(("StandSilhouette", stand_sil.OuterWire, (1.0, 0.0, 0.0), True, 0))
 
     # --- Top tray: markers + score pad in the two bays (not in offsets.txt) --------------------
     tz = cfg.SMALL_TRAY_RIM_Z + cfg.INSERT_FLOOR  # top-tray pocket floor
