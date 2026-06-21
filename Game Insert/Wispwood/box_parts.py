@@ -30,7 +30,7 @@ import stand as st
 from FreeCAD import Vector
 
 # Folded-stand placement in the box (from offsets.txt), shared with BoxParts.FCMacro.
-STAND_OFFSET = (3.0, 110.5, 3.0)
+STAND_OFFSET = (3.0, 110.5, 9.2)
 
 
 def _box(x, y, z, dx, dy, dz):
@@ -349,15 +349,22 @@ def _stand_silhouette(grow):
     return outer
 
 
-def _stadium_cut(cx, cy, span, r, z, h):
-    """Return a vertical obround cutter: a box of length ``span`` in X with a cap at each end.
+def _stadium_cut(cx, cy, span, r, z, h, axis="x"):
+    """Return a vertical obround cutter: a box of length ``span`` with a cap at each end.
 
     Two hemicylinders (radius ``r``) flank a central box, centred at ``(cx, cy)`` and rising
-    ``h`` from ``z`` -- a wide rounded finger scoop rather than a single hemicylinder.
+    ``h`` from ``z`` -- a wide rounded finger scoop rather than a single hemicylinder. ``axis``
+    selects whether the span runs along X (default) or Y.
     """
-    cut = _box(cx - span / 2.0, cy - r, z, span, 2.0 * r, h)
-    cut = cut.fuse(_zcyl(r, h, cx - span / 2.0, cy, z))
-    return cut.fuse(_zcyl(r, h, cx + span / 2.0, cy, z))
+    half = span / 2.0
+    if axis == "y":
+        cut = _box(cx - r, cy - half, z, 2.0 * r, span, h)
+        c0, c1 = (cx, cy - half), (cx, cy + half)
+    else:
+        cut = _box(cx - half, cy - r, z, span, 2.0 * r, h)
+        c0, c1 = (cx - half, cy), (cx + half, cy)
+    cut = cut.fuse(_zcyl(r, h, c0[0], c0[1], z))
+    return cut.fuse(_zcyl(r, h, c1[0], c1[1], z))
 
 
 def _support_post(top_z):
@@ -398,9 +405,11 @@ def build_bottom_tray(components, stand_sil):
     """
     box = _solid_lower_box()
     map_zmin = None
+    bbs = {}
     for name, shape, _rgb in components:
         if name == "MapOuterStack":
             map_zmin = shape.BoundBox.ZMin
+        bbs[name] = shape.BoundBox
         try:
             box = box.cut(_pocket_cutter(shape, d.WALL_TOP, cfg.STAND_BAY_CLEAR))
         except Exception:
@@ -413,11 +422,19 @@ def build_bottom_tray(components, stand_sil):
             pass
     r = bl.bottom_regions()["wispwood"]
     y0 = r.y + r.h + cfg.COMPONENT_CLEARANCE
-    box = box.cut(
-        _stadium_cut(
-            r.x + r.w / 2.0, y0, cfg.FINGER_SCOOP_SPAN, cfg.FINGER_SCOOP_R, -0.5, d.WALL_TOP + 1.0
-        )
-    )
+    fr = cfg.FINGER_SCOOP_R
+    full_h = d.WALL_TOP + 1.0
+    box = box.cut(_stadium_cut(r.x + r.w / 2.0, y0, cfg.FINGER_SCOOP_SPAN, fr, -0.5, full_h))
+    # Retrieval scoops: one bridging the gap between the cards and solo tokens (spans Y between
+    # their pockets), one across the front end of the cat-token row.
+    cards, solo, cats = bbs.get("Cards"), bbs.get("SoloTokensx8"), bbs.get("CatTokensx6")
+    if cards is not None and solo is not None:
+        gx = (max(cards.XMin, solo.XMin) + min(cards.XMax, solo.XMax)) / 2.0
+        gy0, gy1 = min(cards.YMax, solo.YMax), max(cards.YMin, solo.YMin)
+        box = box.cut(_stadium_cut(gx, (gy0 + gy1) / 2.0, gy1 - gy0, fr, -0.5, full_h, axis="y"))
+    if cats is not None:
+        cx = (cats.XMin + cats.XMax) / 2.0
+        box = box.cut(_stadium_cut(cx, cats.YMin, cats.XLength * 0.6, fr, -0.5, full_h))
     if map_zmin is not None:  # support post in the stand window, holding up the map ends
         try:
             box = box.fuse(_support_post(map_zmin))

@@ -59,6 +59,19 @@ def build_top_tray():
     fit = cfg.TOP_TRAY_FIT
     block = _box(-fit, -fit, 0.0, cfg.BOX_W + 2 * fit, cfg.BOX_L + 2 * fit, depth)
 
+    # Round all four vertical corners to the box's interior radius (so the oversized plate seats
+    # concentric with the rounded box walls), matching the bottom box's filleted corners.
+    rr = cfg.BOX_CORNER_R + fit
+    corners = [
+        e
+        for e in block.Edges
+        if abs(e.BoundBox.ZLength - depth) < 1e-6
+        and e.BoundBox.XLength < 1e-6
+        and e.BoundBox.YLength < 1e-6
+    ]
+    if corners:
+        block = block.makeFillet(rr, corners)
+
     for key in ("board_pocket", "marker_trough"):
         r = t[key]
         block = block.cut(_box(r.x, r.y, floor, r.w, r.h, depth))
