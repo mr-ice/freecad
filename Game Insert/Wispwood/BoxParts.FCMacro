@@ -60,7 +60,12 @@ tray = [
 # Top tray + box-reference shell (box_insert.build_all), the folded stand, and the bottom-space
 # model (box_parts). We design the organizer in the bottom space; the top tray is kept.
 insert = list(box_insert.build_all())
-folded_stand = list(box_insert.place_stand(stand.build_all()))
+# Folded stand at the recorded manual position (offsets.txt): native stand (minus the display
+# offset) translated by (3, 110.5, 3).
+folded_stand = []
+for name, shape, rgb, visible, transparency in stand.build_all():
+    shape.translate(App.Vector(3.0 - stand.DISPLAY_X_OFFSET, 110.5, 3.0))
+    folded_stand.append((name, shape, rgb, visible, transparency))
 parts = tray + insert + folded_stand + list(box_parts.build_all())
 
 for name, shape, rgb, visible, transparency in parts:

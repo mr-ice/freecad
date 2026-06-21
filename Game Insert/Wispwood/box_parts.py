@@ -288,41 +288,67 @@ def _placed(name, shape, x, y, z, rgb, rot=0.0):
     return (name, shape, rgb, True, 0)
 
 
-def build_all():
-    """Build the lower space + every component placed for a full fit-check.
+def _place(name, shape, x, y, z, r, rgb):
+    """Apply a FreeCAD object placement: rotate ``r`` deg about the global Z origin, then translate.
 
-    The BOTTOM layer (the rework focus) holds the cards, cats on edge, and solo tokens beside
-    the tray, clear of the folded-stand bay (placed by ``box_insert.place_stand``). The TOP
-    layer is shown for fit-checking against the kept top tray: the board sections (stacked) and
-    markers sit in the top-tray pockets, and the paw + score pad lie loose on top. A first-pass
-    arrangement -- drag/adjust in FreeCAD.
+    This reproduces the recorded manual positions in ``offsets.txt`` (the object's
+    ``Placement`` = a Z rotation about the origin plus a base translation).
+    """
+    if r:
+        shape.rotate(Vector(0.0, 0.0, 0.0), Vector(0.0, 0.0, 1.0), r)
+    shape.translate(Vector(x, y, z))
+    return (name, shape, rgb, True, 0)
+
+
+def _place_center(name, shape, cx, cy, z, rgb):
+    """Place a shape by its bbox centre in XY at ``(cx, cy)`` with its bottom at ``z``."""
+    bb = shape.BoundBox
+    shape.translate(Vector(cx - bb.Center.x, cy - bb.Center.y, z - bb.ZMin))
+    return (name, shape, rgb, True, 0)
+
+
+def build_all():
+    """Build the bottom tray + every component at the recorded manual positions (offsets.txt).
+
+    The bottom-layer contents (outer-map stack, center, cards, paw, cats, solo tokens) are placed
+    at the positions recorded after manual arrangement; the markers + score pad stay in the kept
+    top tray (not recorded). Each recorded position is a FreeCAD placement (Z rotation about the
+    origin + base translation); the center octagon is placed by its centre.
 
     Returns
     -------
     list of tuple
         ``(name, shape, (r, g, b), visible, transparency)``.
     """
-    fz = cfg.INSERT_FLOOR  # bottom contents sit on the bottom-tray floor
-    bt = cfg.BOARD_THICKNESS
     parts = [("BottomTray", build_bottom_tray(), (0.55, 0.6, 0.6), True, 70)]
-    # --- Bottom layer (on the tray floor) -----------------------------------------------------
-    # The outer-map stack lies at 116 deg, threading the gap between the stand's lip extensions;
-    # the center octagon sits on top of it. Drag to fine-tune against the folded stand.
+    # --- Bottom layer: recorded manual positions (offsets.txt) --------------------------------
     parts.append(
-        _placed(
-            "MapOuterStack", build_outer_map_stack(), 8.0, 92.0, fz, (0.45, 0.65, 0.45), rot=232.0
+        _place(
+            "MapOuterStack",
+            build_outer_map_stack(),
+            101.042,
+            282.206,
+            31.600,
+            232.0,
+            (0.45, 0.65, 0.45),
         )
     )
     parts.append(
-        _placed("MapCenter", build_center_map(), 35.0, 120.0, fz + 4 * bt, (0.30, 0.55, 0.30))
+        _place_center("MapCenter", build_center_map(), 120.162, 200.262, 40.532, (0.30, 0.55, 0.30))
     )
-    parts.append(_placed("Cards", build_cards(), 96.0, 92.0, fz, (0.85, 0.75, 0.45), rot=90.0))
-    parts.append(_placed("CatTokensx6", build_cats(), 10.0, 212.0, fz, (0.70, 0.50, 0.80)))
-    parts.append(_placed("SoloTokensx8", build_solo_tokens(), 56.0, 212.0, fz, (0.55, 0.55, 0.85)))
+    parts.append(_place("Cards", build_cards(), 119.800, 88.500, 33.000, 0.0, (0.85, 0.75, 0.45)))
+    parts.append(_place("PawToken", build_paw(), 60.200, 176.500, 29.200, 0.0, (0.85, 0.55, 0.55)))
+    parts.append(
+        _place("CatTokensx6", build_cats(), 13.300, 223.200, 5.800, 0.0, (0.70, 0.50, 0.80))
+    )
+    parts.append(
+        _place(
+            "SoloTokensx8", build_solo_tokens(), 151.400, 216.000, 23.300, 0.0, (0.55, 0.55, 0.85)
+        )
+    )
 
-    # --- Top tray (markers + score pad in the two bays) + paw loose on top ---------------------
+    # --- Top tray: markers + score pad in the two bays (not in offsets.txt) --------------------
     tz = cfg.SMALL_TRAY_RIM_Z + cfg.INSERT_FLOOR  # top-tray pocket floor
-    top = cfg.SMALL_TRAY_RIM_Z + cfg.TOP_TRAY_DEPTH  # top-tray rim (loose items rest here)
     bp = bl.top_regions()["board_pocket"]
     mt = bl.top_regions()["marker_trough"]
     parts.append(
@@ -333,5 +359,4 @@ def build_all():
             "Markersx4", build_markers(), mt.x + 1.0, mt.y + 1.0, tz, (0.50, 0.75, 0.80), rot=90.0
         )
     )
-    parts.append(_placed("PawToken", build_paw(), 130.0, 25.0, top, (0.85, 0.55, 0.55)))
     return parts
