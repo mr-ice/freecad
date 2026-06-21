@@ -265,6 +265,7 @@ BOOKLET_THICKNESS = 1.0
 BOARD_POCKET_SLACK = 5.0  # loose slack around the board-piece stack in the top-tray pocket
 INSERT_WALL = 2.0  # well/divider wall thickness
 BOTTOM_TRAY_WALL = 1.5  # bottom-tray outer wall thickness (3 sides not adjacent to the tray)
+STAND_BAY_CLEAR = 1.0  # clearance between the folded stand and its bay divider walls
 INSERT_FLOOR = 1.5  # tray floor thickness
 TOP_TRAY_DEPTH = 12.0  # top-tray height (board stack is the tallest content)
 TOP_TRAY_FIT = 0.4  # per-side oversize of the top tray so it friction-fits and covers the box ends

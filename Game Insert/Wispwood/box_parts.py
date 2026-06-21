@@ -26,7 +26,11 @@ import box_layout as bl
 import config as cfg
 import derived as d
 import Part
+import stand as st
 from FreeCAD import Vector
+
+# Folded-stand placement in the box (from offsets.txt), shared with BoxParts.FCMacro.
+STAND_OFFSET = (3.0, 110.5, 3.0)
 
 
 def _box(x, y, z, dx, dy, dz):
@@ -266,6 +270,15 @@ def build_bottom_tray():
     tray = tray.fuse(_box(0.0, y0, 0.0, wt, depth, h))  # left wall
     tray = tray.fuse(_box(cfg.BOX_W - wt, y0, 0.0, wt, depth, h))  # right wall
     tray = tray.fuse(_box(0.0, cfg.BOX_L - wt, 0.0, cfg.BOX_W, wt, h))  # back wall
+    # Stand bay: dividers enclosing the folded stand (at STAND_OFFSET), on its right (+X) and
+    # back (+Y); the left outer wall and the open front (toward the Wispwood tray) complete it.
+    clr = cfg.STAND_BAY_CLEAR
+    dx = STAND_OFFSET[0] + st.W + clr  # right divider X
+    dy = STAND_OFFSET[1] + st.SHELF_H + clr  # back divider Y
+    tray = tray.fuse(_box(dx, y0, 0.0, wt, dy - y0, h))  # right divider (runs front to back)
+    tray = tray.fuse(
+        _box(0.0, dy, 0.0, dx + wt, wt, h)
+    )  # back divider (left wall to right divider)
     # Round the two back outer corners to the box's interior radius (cut the sharp bit; works with
     # thin walls where makeFillet would not fit).
     for cx in (0.0, cfg.BOX_W):
