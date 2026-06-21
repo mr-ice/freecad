@@ -276,7 +276,7 @@ FINGER_GROOVE_R = 8.0  # radius of the vertical finger grooves cut through the s
 FINGER_SCOOP_R = FINGER_GROOVE_R + 4.0  # finger-scoop end radius (Z depth kept; obround end caps)
 FINGER_SCOOP_SPAN = 50.0  # X distance between the two scoop end centres (box span between the caps)
 FINGER_SCOOP_DEPTH = (
-    12.0  # shallow retrieval-scoop depth from the rim (so parts can't drop into it)
+    30.0  # deep enough to get to the bottom of the stack (maybe we turn the stack)
 )
 SMALL_TRAY_RIM_Z = (
     FLOOR_THICKNESS + POCKET_DEPTH + LID_THICKNESS + LID_SLIDE_CLEARANCE + LID_TOP_LIP

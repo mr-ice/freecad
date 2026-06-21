@@ -38,6 +38,12 @@ general rules never have to be repeated per project. See [Projects](#projects) b
 
 - Lint and format all Python with **`ruff check`** and **`ruff format`**.
 
+## Git / commits
+
+- **Don't repeatedly prompt to commit.** After finishing a change, do not end with a
+  "want me to commit?" question. Commit (or push) only when the user explicitly asks; until
+  then, just leave the changes pending without asking each turn.
+
 ## Projects
 
 Each subproject keeps its own design intent and specific parameters (sizes, tolerances,
