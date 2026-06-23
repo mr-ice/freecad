@@ -5,7 +5,7 @@ import config as cfg
 
 def test_box_interior_dimensions():
     """Box interior dimensions match measured values."""
-    assert (cfg.BOX_W, cfg.BOX_L, cfg.BOX_H) == (185.0, 265.0, 65.0)
+    assert (cfg.BOX_W, cfg.BOX_L, cfg.BOX_H) == (183.64, 265.0, 65.0)
 
 
 def test_stock_matches_tile_thickness():

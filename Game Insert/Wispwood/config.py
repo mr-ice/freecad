@@ -210,10 +210,10 @@ TRAY_LID_TRANSPARENCY = 80
 # --- Box insert --------------------------------------------------------------
 # The retail box holds the Wispwood tray plus the rest of the game. Flat cardboard
 # (board pieces, markers, paw, score pad, booklet) is the same stock as the tree tiles.
-BOX_W = 185.0  # box interior width (X)
+BOX_W = 183.64  # box interior width (X); set to the Wispwood tray OUTER_LENGTH so it fits exactly
 BOX_L = 265.0  # box interior length (Y)
 BOX_H = 65.0  # box interior height (Z)
-BOX_CORNER_R = 4.0  # box interior vertical corner radius (insert outer corners filleted to fit)
+BOX_CORNER_R = 5.0  # box interior vertical corner radius (insert outer corners filleted to fit)
 STOCK_THICKNESS = TILE_THICKNESS  # all flat cardboard stock (~2.133)
 
 # Cat tokens: double tree-tile thickness, stored ON EDGE (35x35 face vertical).
@@ -268,16 +268,13 @@ BOTTOM_TRAY_WALL = 1.5  # bottom-tray outer wall thickness (3 sides not adjacent
 STAND_BAY_CLEAR = (
     0.75  # outward grow of the bottom-organizer pockets (stand + parts) so they drop in freely
 )
-SUPPORT_POST_CORNER_R = 3.0  # rounded-rectangle corner radius of the map-support post
 INSERT_FLOOR = 1.5  # tray floor thickness
 TOP_TRAY_DEPTH = 12.0  # top-tray height (board stack is the tallest content)
 TOP_TRAY_FIT = 0.4  # per-side oversize of the top tray so it friction-fits and covers the box ends
 FINGER_GROOVE_R = 8.0  # radius of the vertical finger grooves cut through the small-tray well walls
 FINGER_SCOOP_R = FINGER_GROOVE_R + 4.0  # finger-scoop end radius (Z depth kept; obround end caps)
 FINGER_SCOOP_SPAN = 50.0  # X distance between the two scoop end centres (box span between the caps)
-FINGER_SCOOP_DEPTH = (
-    30.0  # deep enough to get to the bottom of the stack (maybe we turn the stack)
-)
+FINGER_SCOOP_DEPTH = 30.0  # deep enough to get to the bottom of the stack (maybe we turn the stack)
 SMALL_TRAY_RIM_Z = (
     FLOOR_THICKNESS + POCKET_DEPTH + LID_THICKNESS + LID_SLIDE_CLEARANCE + LID_TOP_LIP
 )  # = Wispwood WALL_TOP (~42.7); top tray rests flush on the Wispwood + small trays

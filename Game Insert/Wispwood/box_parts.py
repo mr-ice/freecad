@@ -197,9 +197,14 @@ def build_paw():
 
 
 def build_solo_tokens():
-    """Return the 8 solo tokens as a single stacked cylinder (the storage envelope)."""
+    """Return the 8 solo tokens as a single roll lying on its side (cylinder axis horizontal).
+
+    The disks stand vertically (faces in the Y-Z plane), rolled along X -- so the storage
+    envelope is a horizontal cylinder cradled in a trough (see :func:`_roll_pocket`).
+    """
     h = cfg.ROUND_TOKEN_COUNT * cfg.ROUND_TOKEN_THICKNESS
-    return Part.makeCylinder(cfg.ROUND_TOKEN_DIA / 2.0, h, Vector(0.0, 0.0, 0.0), Vector(0, 0, 1))
+    roll = Part.makeCylinder(cfg.ROUND_TOKEN_DIA / 2.0, h, Vector(0.0, 0.0, 0.0), Vector(1, 0, 0))
+    return _at_origin(roll)
 
 
 def build_cats():
@@ -367,31 +372,33 @@ def _stadium_cut(cx, cy, span, r, z, h, axis="x"):
     return cut.fuse(_zcyl(r, h, c1[0], c1[1], z))
 
 
-def _support_post(top_z):
-    """Return a rounded-rectangular support post from the box floor up to ``top_z``.
+def _roll_pocket(solid, top_z, clr):
+    """Return a pocket for a horizontal cylindrical roll: a cradle cylinder + an open-top box.
 
-    Sized to fit the folded stand's open window -- between the base hinge bar (``HBY``) and the
-    shelf crossmember / leg hinge (``CROSS_Y``), and between the base side rails (``NECK_XS``) --
-    with ``STAND_BAY_CLEAR`` all round so it slides through the stand. It rises through the stand
-    pocket to hold up the overhanging ends of the outer-map stack (which sit over this window).
+    The roll's horizontal axis is the bbox dimension that differs from the other two (which equal
+    the diameter, the vertical one being Z). The lower half is cradled in a clearance cylinder; a
+    box from the roll centreline up through ``top_z`` opens the top so the roll drops in and lifts
+    straight out.
     """
-    ox, oy, _oz = STAND_OFFSET
-    clr = cfg.STAND_BAY_CLEAR
-    x0 = st.NECK_XS[0] + st.ROD_R + clr + ox
-    x1 = st.NECK_XS[1] - st.ROD_R - clr + ox
-    y0 = st.HBY + st.KNUCK_R + clr + oy
-    y1 = st.CROSS_Y - st.ROD_R - clr + oy
-    post = _box(x0, y0, 0.0, x1 - x0, y1 - y0, top_z)
-    vert = [
-        e
-        for e in post.Edges
-        if e.BoundBox.ZLength > top_z - 0.01
-        and e.BoundBox.XLength < 1e-6
-        and e.BoundBox.YLength < 1e-6
-    ]
-    if vert:
-        post = post.makeFillet(cfg.SUPPORT_POST_CORNER_R, vert)
-    return post
+    bb = solid.BoundBox
+    dia = bb.ZLength  # lying down: the vertical extent is the diameter
+    r = dia / 2.0 + clr
+    cz = bb.Center.z
+    up = top_z - cz + 1.0
+    along_x = abs(bb.XLength - dia) > abs(bb.YLength - dia)  # the longer-vs-diameter horizontal dim
+    if along_x:
+        cy = bb.Center.y
+        cradle = Part.makeCylinder(
+            r, bb.XLength + 2 * clr, Vector(bb.XMin - clr, cy, cz), Vector(1, 0, 0)
+        )
+        lift = _box(bb.XMin - clr, cy - r, cz, bb.XLength + 2 * clr, 2 * r, up)
+    else:
+        cx = bb.Center.x
+        cradle = Part.makeCylinder(
+            r, bb.YLength + 2 * clr, Vector(cx, bb.YMin - clr, cz), Vector(0, 1, 0)
+        )
+        lift = _box(cx - r, bb.YMin - clr, cz, 2 * r, bb.YLength + 2 * clr, up)
+    return cradle.fuse(lift)
 
 
 def build_bottom_tray(components, stand_sil):
@@ -399,19 +406,17 @@ def build_bottom_tray(components, stand_sil):
 
     Starts from the whole solid bottom box and subtracts each part's outer-perimeter footprint
     (extruded from its resting Z up through the top) -- the parts drop in from above and the
-    leftover material forms the dividers. The stand uses its combined shelf+base silhouette
-    (``stand_sil``). Also cuts a deep front finger scoop to lift the Wispwood tray out, and -- last,
-    so it survives the stand cut -- fuses a support post under the overhanging outer-map ends.
+    leftover material forms the dividers. The solo-token roll gets a cradle-and-open-top trough
+    (:func:`_roll_pocket`); the stand uses its combined shelf+base silhouette (``stand_sil``).
+    Also cuts a deep front finger scoop to lift the Wispwood tray out.
     """
     box = _solid_lower_box()
-    map_zmin = None
     bbs = {}
     for name, shape, _rgb in components:
-        if name == "MapOuterStack":
-            map_zmin = shape.BoundBox.ZMin
         bbs[name] = shape.BoundBox
+        cutter = _roll_pocket if name == "SoloTokensx8" else _pocket_cutter
         try:
-            box = box.cut(_pocket_cutter(shape, d.WALL_TOP, cfg.STAND_BAY_CLEAR))
+            box = box.cut(cutter(shape, d.WALL_TOP, cfg.STAND_BAY_CLEAR))
         except Exception:
             pass
     if stand_sil is not None:  # combined shelf+base outline pocket
@@ -442,11 +447,6 @@ def build_bottom_tray(components, stand_sil):
         # Keep the total X width (span + 2*r) within the cat bay so the cats stay seated.
         cat_span = max(cats.XLength * 0.8 - 2.0 * fr, 0.0)
         box = box.cut(_stadium_cut(cx, cats.YMin, cat_span, fr, sz, sh))
-    if map_zmin is not None:  # support post in the stand window, holding up the map ends
-        try:
-            box = box.fuse(_support_post(map_zmin))
-        except Exception:
-            pass
     return box
 
 
@@ -479,26 +479,36 @@ def _shape_centered(shape, cx, cy, z):
 
 
 def _bottom_components():
-    """Return the bottom-layer parts as ``(name, placed_solid, rgb)`` at the recorded positions."""
+    """Return the bottom-layer parts as ``(name, placed_solid, rgb)`` at the recorded positions.
+
+    The map outer stack, map centre and 1st-player paw were too small for careful bottom pockets
+    and move to the top box (see :func:`_top_loose_components`).
+    """
     return [
-        (
-            "MapOuterStack",
-            _shape_at(build_outer_map_stack(), 101.042, 282.206, 31.600, 232.0),
-            (0.45, 0.65, 0.45),
-        ),
-        (
-            "MapCenter",
-            _shape_centered(build_center_map(), 115.162, 195.262, 40.532),
-            (0.30, 0.55, 0.30),
-        ),
         ("Cards", _shape_at(build_cards(), 119.800, 88.500, 33.000, 0.0), (0.85, 0.75, 0.45)),
-        ("PawToken", _shape_at(build_paw(), 60.200, 176.500, 29.200, 0.0), (0.85, 0.55, 0.55)),
         ("CatTokensx6", _shape_at(build_cats(), 13.300, 223.200, 5.800, 0.0), (0.70, 0.50, 0.80)),
         (
-            "SoloTokensx8",
-            _shape_at(build_solo_tokens(), 151.400, 216.000, 23.300, 0.0),
+            "SoloTokensx8",  # roll on its side, resting on the floor
+            _shape_at(build_solo_tokens(), 151.400, 216.000, 0.000, 0.0),
             (0.55, 0.55, 0.85),
         ),
+    ]
+
+
+def _top_loose_components():
+    """Return the three parts that ride loose in the TOP box (too small for careful pockets).
+
+    The outer-map stack, scalloped map centre and 1st-player paw lie loose on the top tray; shown
+    centred and stacked for fit review (reposition manually, like the others).
+    """
+    ztop = cfg.SMALL_TRAY_RIM_Z + cfg.TOP_TRAY_DEPTH
+    cx, cy = cfg.BOX_W / 2.0, cfg.BOX_L / 2.0
+    mapo = build_outer_map_stack()
+    mapo.rotate(Vector(0.0, 0.0, 0.0), Vector(0.0, 0.0, 1.0), 90.0)  # long axis along Y to fit
+    return [
+        ("MapOuterStack", _shape_centered(mapo, cx, cy, ztop), (0.45, 0.65, 0.45)),
+        ("MapCenter", _shape_centered(build_center_map(), cx, cy, ztop), (0.30, 0.55, 0.30)),
+        ("PawToken", _shape_centered(build_paw(), cx, cy, ztop), (0.85, 0.55, 0.55)),
     ]
 
 
@@ -538,4 +548,7 @@ def build_all():
             "Markersx4", build_markers(), mt.x + 1.0, mt.y + 1.0, tz, (0.50, 0.75, 0.80), rot=90.0
         )
     )
+    # The three parts too small for careful bottom pockets ride loose in the top box.
+    for name, shape, rgb in _top_loose_components():
+        parts.append((name, shape, rgb, True, 0))
     return parts
