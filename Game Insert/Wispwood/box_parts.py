@@ -485,11 +485,17 @@ def _bottom_components():
     and move to the top box (see :func:`_top_loose_components`).
     """
     return [
-        ("Cards", _shape_at(build_cards(), 119.800, 88.500, 33.000, 0.0), (0.85, 0.75, 0.45)),
+        ("Cards", _shape_at(build_cards(), 119.800, 98.500, 33.000, 0.0), (0.85, 0.75, 0.45)),
         ("CatTokensx6", _shape_at(build_cats(), 13.300, 223.200, 5.800, 0.0), (0.70, 0.50, 0.80)),
         (
-            "SoloTokensx8",  # roll on its side, resting on the floor
-            _shape_at(build_solo_tokens(), 151.400, 216.000, 0.000, 0.0),
+            "SoloTokensx8",  # roll on its side (axis along Y), raised so its top sits at the rim
+            _shape_at(
+                build_solo_tokens(),
+                151.400,
+                216.000,
+                d.WALL_TOP - cfg.ROUND_TOKEN_DIA,
+                90.0,
+            ),
             (0.55, 0.55, 0.85),
         ),
     ]
