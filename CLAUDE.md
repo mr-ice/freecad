@@ -58,3 +58,5 @@ together with this file. Add new projects to this list as they gain a `PROJECT.m
   clips and labels.
 - [Game Insert/Wispwood](Game%20Insert/Wispwood/PROJECT.md) — two-stack Wispwood tile rack
   with a two-part sliding/dispensing lid and an integrated folding stand.
+- [BombBusters](BombBusters/PROJECT.md) — reference geometry for BombBusters game
+  components (tokens, markers, discs, cards) and the box envelope, for layout planning.

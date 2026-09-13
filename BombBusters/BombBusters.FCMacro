@@ -1,0 +1,58 @@
+"""FreeCAD macro: build the BombBusters token/card/marker reference shapes.
+
+Run inside FreeCAD 1.0.2. Reloads the project's Python modules so edits take effect
+without restarting FreeCAD, recreates the document from scratch, builds the parts, and
+sets an isometric, fit-all view (see the repository ``CLAUDE.md``).
+"""
+
+import importlib
+import os
+import sys
+
+import FreeCAD as App
+import FreeCADGui as Gui
+
+DOC_NAME = "BombBusters"
+
+# Make sure the project directory (this macro's folder) is importable.
+try:
+    _macro_dir = os.path.dirname(os.path.abspath(__file__))
+except NameError:  # __file__ is undefined in some macro contexts
+    _macro_dir = (
+        os.path.dirname(os.path.abspath(App.ActiveDocument.FileName))
+        if App.ActiveDocument
+        else os.getcwd()
+    )
+if _macro_dir not in sys.path:
+    sys.path.insert(0, _macro_dir)
+
+# Reload config first, then the geometry module so it picks up the latest constants.
+import config  # noqa: E402
+
+importlib.reload(config)
+import tokens  # noqa: E402
+
+importlib.reload(tokens)
+
+# Recreate the document from scratch.
+if DOC_NAME in App.listDocuments():
+    App.closeDocument(DOC_NAME)
+doc = App.newDocument(DOC_NAME)
+
+for name, shape in tokens.build_all():
+    obj = doc.addObject("Part::Feature", name)
+    obj.Shape = shape
+    if name.startswith("Tray_") and obj.ViewObject is not None:
+        # Cutting tools for the TokenTray pocket cut, not meant to be seen.
+        obj.ViewObject.Visibility = False
+
+box_obj = doc.addObject("Part::Feature", "Box_Reference")
+box_obj.Shape = tokens.build_box()
+if box_obj.ViewObject is not None:
+    box_obj.ViewObject.Transparency = 80
+
+doc.recompute()
+
+# Isometric view, fit everything.
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")
