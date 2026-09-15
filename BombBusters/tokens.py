@@ -19,8 +19,11 @@ no fuse axis; ``Quantity`` copies are placed side by side instead.
 Public API
 ----------
 ``build_wire_tokens``, ``build_equipment_tokens``, ``build_info_tokens``,
-``build_info_markers``, ``build_blue_cut_disc``, ``build_cards``, ``build_box``,
-``build_token_tray``, ``build_token_tray_lid``, ``build_tray_contents``,
+``build_info_markers``, ``build_blue_cut_disc``, ``build_cards``,
+``build_card_equipment_double``, ``build_box``, ``build_token_tray``,
+``build_token_tray_lid``, ``build_wire_tray``, ``build_wire_tray_access_holes``,
+``build_wire_tray_pocket``, ``build_wire_tray_contents``,
+``build_wire_tray_middle_pocket``, ``build_tray_contents``,
 ``build_tray_access_hole``, ``build_tray_joint_cuts``, ``build_all``.
 """
 
@@ -35,10 +38,34 @@ PAIR_GAP = 4.0  # gap between adjacent items within a group, mm -- wide enough t
 # each InfoMarker hole can take its own top fillet without meeting its neighbor's
 MARKER_FILLET = 2.0  # fillet radius on InfoMarker.Yellow's vertical edges, mm
 
+# TokenTray/TokenTrayLid's own +X edge, pulled back from the box's own +X edge
+# by 2x WALL_THICKNESS: TokenTrayLid's right leg extends _LEG_LENGTH past
+# whatever this is (see build_token_tray_lid) -- at the box's own edge, that
+# leg poked straight through it. Pulling the tray back this far instead means
+# the LEG's own outer face lands flush with the box, not the tray body's.
+_TOKEN_TRAY_X_SHIFT = -2 * cfg.WALL_THICKNESS
+_TOKEN_TRAY_X_MAX = cfg.Box["Height"] + _TOKEN_TRAY_X_SHIFT
+
 # Per-part placement overrides, applied on top of build_all()'s automatic grid.
 # name -> (offset: Vector, rotation: (axis: Vector, angle_degrees) or None).
 # Add an entry here to move a specific part to its final spot; anything not listed
 # keeps its automatic grid position.
+_CARD_MISSION_X = cfg.Card["Equipment"]["Width"] + cfg.WALL_THICKNESS * 7
+_CARD_MISSION_BASE_Z = (
+    cfg.Box["Depth"]
+    - cfg.WALL_THICKNESS
+    - cfg.Card["Equipment"]["Thickness"] * cfg.Card["Equipment"]["Quantity"]
+)
+
+# Card_Equipment's near edge abuts the Red/Yellow wire pockets' far edge
+# (WireToken_Height + WALL_THICKNESS). Card_Equipment_Double sits WALL_THICKNESS
+# further along X, clear of that pocket edge, and WALL_THICKNESS + 6mm above it.
+_CARD_EQUIPMENT_X = (cfg.WireToken["Height"] + cfg.WALL_THICKNESS) + (
+    cfg.Card["Equipment"]["Width"] + cfg.TOLERANCE
+)
+_CARD_EQUIPMENT_BASE_Z = cfg.WALL_THICKNESS
+_CARD_EQUIPMENT_DOUBLE_X = _CARD_EQUIPMENT_X + cfg.WALL_THICKNESS
+
 PLACEMENTS = {
     # Red Tokens are rotated and fit inside the WALL_THICKNESS
     "WireToken_Red": (
@@ -77,23 +104,18 @@ PLACEMENTS = {
         (Vector(0, 0, 1), 90),
     ),
     "Card_Mission": (
-        Vector(
-            cfg.Card["Equipment"]["Width"] + cfg.WALL_THICKNESS * 6,
-            cfg.WALL_THICKNESS,
-            cfg.Box["Depth"]
-            - cfg.WALL_THICKNESS
-            - cfg.Card["Equipment"]["Thickness"] * cfg.Card["Equipment"]["Quantity"],
-        ),
+        Vector(_CARD_MISSION_X, cfg.WALL_THICKNESS, _CARD_MISSION_BASE_Z),
         (Vector(0, 0, 1), 0),
     ),
+    # Kept in place but hidden -- superseded by Card_Equipment_Double below.
     "Card_Equipment": (
-        Vector(
-            cfg.Card["Equipment"]["Width"] + cfg.WALL_THICKNESS,
-            cfg.WALL_THICKNESS,
-            cfg.Box["Depth"]
-            - cfg.WALL_THICKNESS
-            - cfg.Card["Equipment"]["Thickness"] * cfg.Card["Equipment"]["Quantity"],
-        ),
+        Vector(_CARD_EQUIPMENT_X, cfg.WALL_THICKNESS, _CARD_EQUIPMENT_BASE_Z),
+        (Vector(0, 0, 1), 90),
+    ),
+    # Double Card_Equipment's reference quantity (twice the Z stack height),
+    # raised 6mm and offset WALL_THICKNESS in +X from where Card_Equipment sits.
+    "Card_Equipment_Double": (
+        Vector(_CARD_EQUIPMENT_DOUBLE_X, cfg.WALL_THICKNESS, _CARD_EQUIPMENT_BASE_Z + 6),
         (Vector(0, 0, 1), 90),
     ),
 }
@@ -159,7 +181,7 @@ _ROW_HEIGHTS = [_ROW0_HEIGHT] + [_GRID_ROW_HEIGHT] * 3
 _GRID_BLOCK_LENGTH = (
     sum(_ROW_HEIGHTS) + _GRID_ROW_GAP * (len(_ROW_HEIGHTS) - 1) + _GRID_ROW_MARGIN * 2
 )
-_GRID_BLOCK_MIN_X = cfg.Box["Height"] - cfg.WALL_THICKNESS - _GRID_BLOCK_LENGTH
+_GRID_BLOCK_MIN_X = _TOKEN_TRAY_X_MAX - cfg.WALL_THICKNESS - _GRID_BLOCK_LENGTH
 
 
 def _grid_row_x(row, block_min_x=_GRID_BLOCK_MIN_X):
@@ -186,6 +208,17 @@ _TALLEST_PART_TOP_Z = max(
     _ROW0_TOP_Z,
 )
 
+# Height of the TokenTray + TokenTrayLid stack, floor to lid top -- also used as
+# WireTray's own height, so the two units sit flush at the same depth.
+_TOKEN_UNIT_TOP_Z = _TALLEST_PART_TOP_Z + cfg.WALL_THICKNESS
+
+# Red/Yellow sit at the top of WireTray instead of the floor -- flush with its
+# own top face, not just near it.
+_WIRE_TOKEN_TOP_Z = _TOKEN_UNIT_TOP_Z - (cfg.WireToken["Width"] + cfg.TOLERANCE)
+for _name in ("WireToken_Red", "WireToken_Yellow"):
+    _offset, _rotation = PLACEMENTS[_name]
+    PLACEMENTS[_name] = (Vector(_offset.x, _offset.y, _WIRE_TOKEN_TOP_Z), _rotation)
+
 # TokenTrayLid's legs: they extend _LEG_LENGTH past the tray's own ends (X) and
 # run the full height down to the floor (Z=0), so each can carry an equilateral
 # triangular key, spanning the tray's full width, that slides into a matching
@@ -208,13 +241,43 @@ _JOINT_HEIGHT = _JOINT_TOTAL_DEPTH * 2 / math.sqrt(3)
 
 # A thin vertical access hole through the BlueCutDisc pocket, so a rod can reach
 # in from above the tray to eject the disc stack.
-_ACCESS_DIAMETER = cfg.BlueCutDisc["Diameter"] * 0.7
+_ACCESS_DIAMETER_MULTIPLIER = 0.7
+_ACCESS_DIAMETER = cfg.BlueCutDisc["Diameter"] * _ACCESS_DIAMETER_MULTIPLIER
 _ACCESS_RADIUS = _ACCESS_DIAMETER / 2
+
+# WireTray's own two access holes get their own, bigger multiplier (its own
+# constant, not shared with the disc-pocket hole above) -- an easier rod fit
+# and, for the horizontal one, reach across most of the Red/Yellow pockets'
+# own height while still breaching WireTray's top face (see
+# build_wire_tray_access_holes).
+_WIRE_ACCESS_DIAMETER_MULTIPLIER = 0.9
+_WIRE_ACCESS_DIAMETER = cfg.BlueCutDisc["Diameter"] * _WIRE_ACCESS_DIAMETER_MULTIPLIER
+_WIRE_ACCESS_RADIUS = _WIRE_ACCESS_DIAMETER / 2
+
+# WireTray's own X extent (see build_wire_tray) -- derived from TokenTrayLid's
+# own left leg's outer face (TokenTray's own left edge, _TOKEN_TRAY_X_MAX minus
+# its own Height, minus TOLERANCE for lid clearance, minus the leg's own
+# length), so it always lands flush with the leg regardless of where TokenTray
+# itself sits (see _TOKEN_TRAY_X_SHIFT).
+_WIRE_TRAY_X_EXTENT = _TOKEN_TRAY_X_MAX - cfg.TokenTray["Height"] - cfg.TOLERANCE - _LEG_LENGTH
+
+# Card_Equipment's near edge / Red+Yellow's far edge -- the seam between the two
+# compartments, and the center of the Red/Yellow row itself (WireToken's own
+# Height, +TOLERANCE, centered back from that seam).
+_WIRE_SEAM_X = cfg.WireToken["Height"] + cfg.WALL_THICKNESS
+_WIRE_TOKEN_ROW_X_MID = _WIRE_SEAM_X - (cfg.WireToken["Height"] + cfg.TOLERANCE) / 2
+
 
 # Master switch: off while debugging the joint cuts, to see whether the cuts
 # alone (with no fillet involved) produce a valid solid.
 _ENABLE_TRAY_FILLETS = True
 _ENABLE_OUTER_EDGE_FILLETS = True
+
+# Per-target debug switches -- flip one off to isolate whether a given
+# target's outer-edge or top-rim fillet pass is what's producing an invalid
+# solid, without losing the fillets on every other target while debugging.
+_ENABLE_OUTER_FILLET_FOR = {"TokenTray": True, "TokenTrayLid": True, "WireTray": True}
+_ENABLE_TOP_RIM_FILLET_FOR = {"TokenTray": True, "TokenTrayLid": True, "WireTray": True}
 
 # TokenTray fillets: its 12 outer edges (top, bottom, and the 4 vertical corners),
 # then the rim of every pocket cut into its top face, rolled out one part category
@@ -222,12 +285,51 @@ _ENABLE_OUTER_EDGE_FILLETS = True
 _TRAY_OUTER_FILLET = 2.0
 _TRAY_TOP_FILLET = 1.5
 
+# WireTray gets the same full outer fillet as TokenTray/TokenTrayLid, all 12
+# edges (physically required so its corners fit inside the cardboard box) --
+# _fillet_edges_best_effort's validity check (see below) is what makes this
+# safe despite Red/Yellow's own pockets sitting close to it.
+_OUTER_FILLET_RADIUS = {
+    "TokenTray": _TRAY_OUTER_FILLET,
+    "TokenTrayLid": _TRAY_OUTER_FILLET,
+    "WireTray": _TRAY_OUTER_FILLET,
+}
+
 # Smaller than _TRAY_TOP_FILLET: even spread out (see PAIR_GAP), adjacent marker
 # holes are only ~3.25mm apart, too tight for the full 1.5mm on each side.
 _MARKER_TOP_FILLET = 1.0
-_ENABLE_DISC_TOP_FILLET = True
-_ENABLE_MARKER_TOP_FILLET = True
-_ENABLE_TOKEN_TOP_FILLET = True
+# Every top-rim (pocket/hole rim) fillet category is off except
+# wire_hole_horizontal -- only the outer box-edge fillets
+# (_fillet_tray_outer_edges) and WireTray_AccessHole_Horizontal's own top rim
+# stay on. The rest proved too fragile a mix of results; flip a category back
+# on individually to revisit it.
+_ENABLE_DISC_TOP_FILLET = False
+_ENABLE_MARKER_TOP_FILLET = False
+_ENABLE_TOKEN_TOP_FILLET = False
+_ENABLE_WIRE_HOLE_VERTICAL_TOP_FILLET = False
+_ENABLE_WIRE_HOLE_HORIZONTAL_TOP_FILLET = True
+_ENABLE_WIRE_POCKET_TOP_FILLET = False
+_ENABLE_WIRE_ITEM_TOP_FILLET = False
+
+# Red/Yellow's own pockets sit close enough to WireTray's outer corner that
+# the full _TRAY_TOP_FILLET radius there crashes OCC outright rather than
+# just failing to fillet (empirically: 1.0mm fillets clean, 1.5mm crashes).
+# Capped well under that measured limit.
+_WIRE_ITEM_TOP_FILLET = 1.0
+
+# WireTray_AccessHole_Vertical's own top rim crashes OCC the same way at the
+# full radius (empirically: 1.2mm fillets clean, 1.5mm crashes) -- capped well
+# under that measured limit, same rationale as _WIRE_ITEM_TOP_FILLET.
+_WIRE_HOLE_TOP_FILLET = 1.0
+
+# WireTray_AccessHole_Horizontal's own top rim -- now that its axis sits
+# exactly on WireTray's top face (a symmetric cut, see
+# build_wire_tray_access_holes), the rim splits into 8 edges where it crosses
+# the Red/Yellow/MiddlePocket cuts right next to it: 4 short straight ones (the
+# actual corners) and 4 longer arcs. Empirically only the 4 short ones fillet
+# at all, and only up to ~0.7mm (1.0mm+ starts losing them, 1.5mm loses all) --
+# capped at that measured limit.
+_WIRE_HOLE_HORIZONTAL_TOP_FILLET = 0.7
 
 # category -> (enabled, fillet radius). Info tokens only fillet their Y-direction
 # edges (see _fillet_tray_top_rims) -- the X-direction ones facing an adjacent column
@@ -236,6 +338,14 @@ _TOP_FILLET_CATEGORIES = (
     ("disc", _ENABLE_DISC_TOP_FILLET, _TRAY_TOP_FILLET),
     ("marker", _ENABLE_MARKER_TOP_FILLET, _MARKER_TOP_FILLET),
     ("token", _ENABLE_TOKEN_TOP_FILLET, _TRAY_TOP_FILLET),
+    ("wire_hole_vertical", _ENABLE_WIRE_HOLE_VERTICAL_TOP_FILLET, _WIRE_HOLE_TOP_FILLET),
+    (
+        "wire_hole_horizontal",
+        _ENABLE_WIRE_HOLE_HORIZONTAL_TOP_FILLET,
+        _WIRE_HOLE_HORIZONTAL_TOP_FILLET,
+    ),
+    ("wire_pocket", _ENABLE_WIRE_POCKET_TOP_FILLET, _TRAY_TOP_FILLET),
+    ("wire_item", _ENABLE_WIRE_ITEM_TOP_FILLET, _WIRE_ITEM_TOP_FILLET),
 )
 
 
@@ -326,10 +436,13 @@ _populate_info_grid_placements("", _GRID_BLOCK_MIN_X)
 # the box's, below.
 _populate_info_grid_placements("Tray_", _GRID_BLOCK_MIN_X)
 
-# TokenTray's +X edge is aligned with the box's +X edge, so it sits directly under
-# the box's own info-token/equipment/marker/disc grid; its own bottom is at Z=0
-# (not raised onto WALL_THICKNESS like the box parts).
-PLACEMENTS["TokenTray"] = (Vector(cfg.Box["Height"] - cfg.TokenTray["Height"], 0, 0), None)
+# TokenTray's +X edge is aligned with _TOKEN_TRAY_X_MAX (pulled back from the
+# box's own +X edge, see _TOKEN_TRAY_X_SHIFT -- otherwise TokenTrayLid's right
+# leg pokes straight through the box), so it sits directly under the box's own
+# info-token/equipment/marker/disc grid (see _GRID_BLOCK_MIN_X, which now
+# shares that same pulled-back edge); its own bottom is at Z=0 (not raised
+# onto WALL_THICKNESS like the box parts).
+PLACEMENTS["TokenTray"] = (Vector(_TOKEN_TRAY_X_MAX - cfg.TokenTray["Height"], 0, 0), None)
 
 # TokenTrayLid is built directly in world coordinates (see build_token_tray_lid),
 # since its legs and joint keys need to line up with the tray's own world
@@ -589,6 +702,28 @@ def build_cards():
     ]
 
 
+def build_card_equipment_double():
+    """Build a second Card_Equipment stack, at double the reference quantity.
+
+    Replaces Card_Equipment (now hidden) as the visible equipment-card
+    reference, raised 6mm above it -- see PLACEMENTS["Card_Equipment_Double"].
+
+    Returns
+    -------
+    list of (str, Part.Shape)
+        ``[("Card_Equipment_Double", shape)]``
+    """
+    equipment = cfg.Card["Equipment"]
+    shape = make_box_stack(
+        equipment["Height"],
+        equipment["Width"],
+        equipment["Thickness"],
+        equipment["Quantity"] * 2,
+        cfg.Card["Z"],
+    )
+    return [("Card_Equipment_Double", shape)]
+
+
 def build_box():
     """Build the config.Box envelope as a reference volume.
 
@@ -611,6 +746,165 @@ def build_token_tray():
     """
     tray = cfg.TokenTray
     return [("TokenTray", Part.makeBox(tray["Height"], tray["Width"], tray["Depth"]))]
+
+
+def build_wire_tray():
+    """Build a box housing WireToken_Red/Yellow and Card_Equipment.
+
+    Fills the box interior left over once TokenTray claims its own footprint,
+    full Box width, sharing TokenTrayLid's total height (_TOKEN_UNIT_TOP_Z) so
+    the two units sit flush at the same depth. Cut short by _LEG_LENGTH on its
+    far end, clear of TokenTrayLid's legs (which reach _LEG_LENGTH past the
+    tray's own near edge, already pulled back by TOLERANCE for lid clearance)
+    -- otherwise the two collide. WireToken_Blue_* isn't housed here -- it
+    already has its own bag. Starts at the origin, so it already abuts that
+    boundary with no offset needed.
+
+    Returns
+    -------
+    list of (str, Part.Shape)
+        ``[("WireTray", shape)]``
+    """
+    return [("WireTray", Part.makeBox(_WIRE_TRAY_X_EXTENT, cfg.Box["Width"], _TOKEN_UNIT_TOP_Z))]
+
+
+def build_wire_tray_access_holes():
+    """Build WireTray's two access holes, both copies of the disc pocket's AccessHole.
+
+    ``WireTray_AccessHole_Vertical`` runs up and down (Z) through the seam
+    between Card_Equipment and the Red/Yellow wire pockets (_WIRE_SEAM_X),
+    centered across the tray's width -- stopping WALL_THICKNESS above the
+    tray's floor (leaving it intact) while overshooting the tray's own top
+    face for a clean cut there.
+
+    ``WireTray_AccessHole_Horizontal`` runs across the tray's full width (Y) at
+    the Red/Yellow row's own X position (_WIRE_TOKEN_ROW_X_MID), longer than
+    the tray/box's own width so it breaches both side walls. Its axis sits
+    exactly on WireTray's own top face -- that face passes straight through
+    the cylinder's center, same as Tray_AccessHole -- for a clean, symmetric
+    cut through the top instead of the lopsided sliver a lower, off-center
+    axis leaves (which fillets unevenly).
+
+    Returns
+    -------
+    list of (str, Part.Shape)
+        ``[("WireTray_AccessHole_Vertical", shape),
+        ("WireTray_AccessHole_Horizontal", shape)]``
+    """
+    overshoot = 1.0
+    vertical_z_min = cfg.WALL_THICKNESS
+    vertical = Part.makeCylinder(
+        _WIRE_ACCESS_RADIUS,
+        _TOKEN_UNIT_TOP_Z + overshoot - vertical_z_min,
+        Vector(_WIRE_SEAM_X, cfg.Box["Width"] / 2, vertical_z_min),
+        Vector(0, 0, 1),
+    )
+
+    side_overshoot = 5.0
+    horizontal = Part.makeCylinder(
+        _WIRE_ACCESS_RADIUS,
+        cfg.Box["Width"] + 2 * side_overshoot,
+        Vector(_WIRE_TOKEN_ROW_X_MID, -side_overshoot, _TOKEN_UNIT_TOP_Z),
+        Vector(0, 1, 0),
+    )
+
+    return [
+        ("WireTray_AccessHole_Vertical", vertical),
+        ("WireTray_AccessHole_Horizontal", horizontal),
+    ]
+
+
+def build_wire_tray_pocket():
+    """Build the pocket for WireTray's leftover space, past Card_Equipment_Double.
+
+    A single open-top pocket filling everything past Card_Equipment_Double's
+    far edge, WALL_THICKNESS in from the other 5 sides (both Y walls, the near
+    wall against Card_Equipment_Double, WireTray's own far wall, and the
+    floor) -- only the top stays open.
+
+    Returns
+    -------
+    list of (str, Part.Shape)
+        ``[("WireTray_Pocket", shape)]``
+    """
+    x_min = _CARD_EQUIPMENT_DOUBLE_X + cfg.WALL_THICKNESS
+    x_max = _WIRE_TRAY_X_EXTENT - cfg.WALL_THICKNESS
+    y_min = cfg.WALL_THICKNESS
+    y_max = cfg.Box["Width"] - cfg.WALL_THICKNESS
+    z_min = cfg.WALL_THICKNESS
+    # Overshoot past the tray's own top face for a clean cut.
+    z_max = _TOKEN_UNIT_TOP_Z + 1.0
+
+    shape = Part.makeBox(x_max - x_min, y_max - y_min, z_max - z_min, Vector(x_min, y_min, z_min))
+    return [("WireTray_Pocket", shape)]
+
+
+def build_wire_tray_contents():
+    """Build WireTray_-prefixed pockets for Red/Yellow and Card_Equipment_Double.
+
+    Each pocket shares its item's own placed X/Y footprint and starts at that
+    item's own Z depth (its real bottom, e.g. _WIRE_TOKEN_TOP_Z for Red/
+    Yellow) -- as deep as the object itself, not the full floor-to-top depth
+    -- open through the top (with overshoot) for a real, top-loading pocket.
+    Reusing the item's own shape directly as the cutting tool instead would
+    carve a fully enclosed cavity: it doesn't reach WireTray's own top face
+    (that WALL_THICKNESS gap is exactly what makes the raised placement work).
+
+    Returns
+    -------
+    list of (str, Part.Shape)
+        ``[("WireTray_WireToken_Red", shape), ("WireTray_WireToken_Yellow", shape),
+        ("WireTray_Card_Equipment_Double", shape)]``
+    """
+    sources = dict(build_wire_tokens())
+    sources.update(build_card_equipment_double())
+
+    z_max = _TOKEN_UNIT_TOP_Z + 1.0
+
+    tools = []
+    for name in ("WireToken_Red", "WireToken_Yellow", "Card_Equipment_Double"):
+        offset, rotation = PLACEMENTS[name]
+        box = place(sources[name], offset, rotation).BoundBox
+        pocket = Part.makeBox(
+            box.XLength, box.YLength, z_max - box.ZMin, Vector(box.XMin, box.YMin, box.ZMin)
+        )
+        tools.append((f"WireTray_{name}", pocket))
+    return tools
+
+
+def build_wire_tray_middle_pocket():
+    """Build the pocket between the Red and Yellow wire pockets.
+
+    Shares Red/Yellow's own X footprint, WALL_THICKNESS clear of each of them
+    in Y, and as deep as Card_Equipment_Double's own Z bottom (deeper than
+    Red/Yellow's own pockets), open through the top (with overshoot) -- the
+    same open-top style as WireTray_Pocket.
+
+    Returns
+    -------
+    list of (str, Part.Shape)
+        ``[("WireTray_MiddlePocket", shape)]``
+    """
+    wire_tokens = dict(build_wire_tokens())
+    red_offset, red_rotation = PLACEMENTS["WireToken_Red"]
+    red_box = place(wire_tokens["WireToken_Red"], red_offset, red_rotation).BoundBox
+    yellow_offset, yellow_rotation = PLACEMENTS["WireToken_Yellow"]
+    yellow_box = place(wire_tokens["WireToken_Yellow"], yellow_offset, yellow_rotation).BoundBox
+
+    card_offset, card_rotation = PLACEMENTS["Card_Equipment_Double"]
+    card_box = place(
+        dict(build_card_equipment_double())["Card_Equipment_Double"], card_offset, card_rotation
+    ).BoundBox
+
+    x_min = red_box.XMin
+    x_max = red_box.XMax
+    y_min = red_box.YMax + cfg.WALL_THICKNESS
+    y_max = yellow_box.YMin - cfg.WALL_THICKNESS
+    z_min = card_box.ZMin
+    z_max = _TOKEN_UNIT_TOP_Z + 1.0
+
+    shape = Part.makeBox(x_max - x_min, y_max - y_min, z_max - z_min, Vector(x_min, y_min, z_min))
+    return [("WireTray_MiddlePocket", shape)]
 
 
 def _triangle_prism(x_start, depth, z_center, height):
@@ -665,8 +959,8 @@ def _lid_joint_prisms():
     tuple of (Part.Shape, Part.Shape)
         ``(left, right)``, pointing +X and -X into the tray respectively.
     """
-    x_min = cfg.Box["Height"] - cfg.TokenTray["Height"] - cfg.TOLERANCE
-    x_max = cfg.Box["Height"]
+    x_min = _TOKEN_TRAY_X_MAX - cfg.TokenTray["Height"]
+    x_max = _TOKEN_TRAY_X_MAX
     left = _triangle_prism(x_min - _JOINT_OVERLAP, _JOINT_TOTAL_DEPTH, _JOINT_Z, _JOINT_HEIGHT)
     right = _triangle_prism(x_max + _JOINT_OVERLAP, -_JOINT_TOTAL_DEPTH, _JOINT_Z, _JOINT_HEIGHT)
     return left, right
@@ -688,9 +982,9 @@ def build_token_tray_lid():
         ``[("TokenTrayLid", shape)]``, already in world coordinates.
     """
     tray = cfg.TokenTray
-    x_min = cfg.Box["Height"] - cfg.TokenTray["Height"] - cfg.TOLERANCE
-    x_max = cfg.Box["Height"]
-    lid_top = _TALLEST_PART_TOP_Z + cfg.WALL_THICKNESS
+    x_min = _TOKEN_TRAY_X_MAX - cfg.TokenTray["Height"] - cfg.TOLERANCE
+    x_max = _TOKEN_TRAY_X_MAX
+    lid_top = _TOKEN_UNIT_TOP_Z
 
     slab = Part.makeBox(
         tray["Height"] + cfg.TOLERANCE,
@@ -807,8 +1101,9 @@ def build_all():
     """Lay out one of every component group, left to right, for scale reference.
 
     Groups: wire tokens, the equipment pair with the info-token pairs right next to
-    it, info markers, the blue cut disc stack, the card stacks, the TokenTray, and
-    a second copy of the info/equipment/marker/disc parts placed on that tray.
+    it, info markers, the blue cut disc stack, the card stacks, the TokenTray, the
+    WireTray plus its own access holes and leftover-space pocket, and a second
+    copy of the info/equipment/marker/disc parts placed on the TokenTray.
     Placement is a simple non-overlapping grid, not a real layout -- combine with
     :func:`build_box` to check fit.
 
@@ -823,8 +1118,14 @@ def build_all():
         build_info_markers(),
         build_blue_cut_disc(),
         build_cards(),
+        build_card_equipment_double(),
         build_token_tray(),
         build_token_tray_lid(),
+        build_wire_tray(),
+        build_wire_tray_access_holes(),
+        build_wire_tray_pocket(),
+        build_wire_tray_contents(),
+        build_wire_tray_middle_pocket(),
         build_tray_contents(),
         build_tray_access_hole(),
         build_tray_joint_cuts(),
@@ -841,20 +1142,22 @@ def build_all():
     return _fillet_tray_top_rims(_cut_tray_contents(_fillet_tray_outer_edges(result)))
 
 
-# Which Tray_-prefixed cutting tools to skip, per target part. TokenTrayLid
-# skips the access hole -- it's meant to poke out through the tray's own top,
-# not the lid sitting above it.
+# Each target's own cutting-tool prefix (so TokenTray/TokenTrayLid's Tray_
+# tools never get cut into WireTray, or vice versa) and which of its own
+# prefixed tools to skip. TokenTrayLid skips the access hole -- it's meant to
+# poke out through the tray's own top, not the lid sitting above it.
 _CUT_TARGETS = {
-    "TokenTray": frozenset(),
-    "TokenTrayLid": frozenset({"Tray_AccessHole", "Tray_JointLeft", "Tray_JointRight"}),
+    "TokenTray": ("Tray_", frozenset()),
+    "TokenTrayLid": ("Tray_", frozenset({"Tray_AccessHole", "Tray_JointLeft", "Tray_JointRight"})),
+    "WireTray": ("WireTray_", frozenset()),
 }
 
 
 def _cut_tray_contents(named_shapes):
-    """Carve a pocket for every Tray_-prefixed part out of each :data:`_CUT_TARGETS` entry.
+    """Carve a pocket for every matching cutting tool out of each :data:`_CUT_TARGETS` entry.
 
-    The Tray_* parts are cutting tools, not visible geometry: BombBusters.FCMacro
-    hides them once this cut is made.
+    Cutting tools are not visible geometry: BombBusters.FCMacro hides them
+    (any ``Tray_*``/``WireTray_*``-prefixed part) once this cut is made.
 
     Parameters
     ----------
@@ -865,18 +1168,18 @@ def _cut_tray_contents(named_shapes):
     -------
     list of (str, Part.Shape)
         `named_shapes` with each target in :data:`_CUT_TARGETS` replaced by
-        itself minus every ``Tray_*`` tool not excluded for that target;
-        unchanged if there are no ``Tray_*`` tools.
+        itself minus every one of its own prefixed tools not excluded for
+        that target; unchanged if it has none.
     """
     shapes_by_name = dict(named_shapes)
-    tools = {name: shape for name, shape in named_shapes if name.startswith("Tray_")}
-    if not tools:
-        return named_shapes
 
     cut_shapes = {}
-    for target, excluded in _CUT_TARGETS.items():
+    for target, (prefix, excluded) in _CUT_TARGETS.items():
         base = shapes_by_name.get(target)
         if base is None:
+            continue
+        tools = {name: shape for name, shape in named_shapes if name.startswith(prefix)}
+        if not tools:
             continue
         cut = base
         for tool_name, tool_shape in tools.items():
@@ -933,17 +1236,35 @@ def _box_corner_edges(shape, x_min, x_max, y_min, y_max, z_min, z_max, tol=1e-6)
             for b2 in axis_bounds[a2]
         )
 
-    def is_straight(edge):
-        p0, p1 = edge.Vertexes[0].Point, edge.Vertexes[1].Point
-        return _near(edge.Length, (p1 - p0).Length, tol)
-
     return [
         edge
         for edge in shape.Edges
         if len(edge.Vertexes) == 2
-        and is_straight(edge)
+        and _is_straight_edge(edge, tol)
         and on_a_shared_edge_line(edge.Vertexes[0].Point, edge.Vertexes[1].Point)
     ]
+
+
+def _is_straight_edge(edge, tol=1e-6):
+    """Return whether `edge` is a straight line, not an arc or other curve.
+
+    Parameters
+    ----------
+    edge : Part.Edge
+        Edge to check.
+    tol : float, optional
+        Length-matching tolerance, in mm.
+
+    Returns
+    -------
+    bool
+        ``True`` if `edge` has exactly 2 vertices and its length matches the
+        straight-line distance between them.
+    """
+    if len(edge.Vertexes) != 2:
+        return False
+    p0, p1 = edge.Vertexes[0].Point, edge.Vertexes[1].Point
+    return _near(edge.Length, (p1 - p0).Length, tol)
 
 
 def _fillet_edges_best_effort(shape, radius, edges):
@@ -958,6 +1279,12 @@ def _fillet_edges_best_effort(shape, radius, edges):
     the batch, retry one edge at a time and leave whichever individually still
     fail unfilleted.
 
+    OCC doesn't always raise on a bad batch, either -- it can return an
+    outright invalid solid with no exception at all (seen with edges too close
+    to a tight pocket wall). ``isValid()`` is checked after every attempt,
+    batch and per-edge alike, and treated the same as a raised error: an
+    invalid result is discarded, not returned or kept.
+
     Parameters
     ----------
     shape : Part.Shape
@@ -970,14 +1297,16 @@ def _fillet_edges_best_effort(shape, radius, edges):
     Returns
     -------
     Part.Shape
-        `shape` with every edge that could be filleted, filleted; `shape`
-        unchanged if `edges` is empty.
+        `shape` with every edge that could be filleted (validly) filleted;
+        `shape` unchanged if `edges` is empty or none could be filleted.
     """
     if not edges:
         return shape
 
     try:
-        return shape.makeFillet(radius, edges)
+        result = shape.makeFillet(radius, edges)
+        if result.isValid():
+            return result
     except Part.OCCError:
         pass
 
@@ -988,18 +1317,23 @@ def _fillet_edges_best_effort(shape, radius, edges):
         if not matches:
             continue
         try:
-            shape = shape.makeFillet(radius, matches)
+            candidate = shape.makeFillet(radius, matches)
         except Part.OCCError:
             continue
+        if candidate.isValid():
+            shape = candidate
     return shape
 
 
 def _tray_tool_category(name):
-    """Return which top-fillet toggle governs the Tray_-prefixed tool `name`.
+    """Return which top-fillet toggle governs the cutting tool `name`.
 
-    Groups the pocket-cutting tools into the three-part rollout: cut discs (plus
-    their coaxial access hole) first, then info markers, then info tokens (which
-    also covers the Equipment token, sharing its row).
+    Groups the pocket-cutting tools into the rollout: for TokenTray/
+    TokenTrayLid, cut discs (plus their coaxial access hole) first, then info
+    markers, then info tokens (which also covers the Equipment token, sharing
+    its row); for WireTray, its two access holes, then its open pockets
+    (leftover space and the Red/Yellow middle gap), then the Red/Yellow and
+    Card_Equipment_Double item pockets.
 
     Parameters
     ----------
@@ -1009,24 +1343,36 @@ def _tray_tool_category(name):
     Returns
     -------
     str or None
-        ``"disc"``, ``"marker"``, or ``"token"``; ``None`` if `name` isn't a
-        ``Tray_``-prefixed pocket/cut tool.
+        ``"disc"``, ``"marker"``, ``"token"``, ``"wire_hole_vertical"``,
+        ``"wire_hole_horizontal"``, ``"wire_pocket"``, or ``"wire_item"``;
+        ``None`` if `name` isn't a recognized pocket/cut tool.
     """
-    if not name.startswith("Tray_"):
+    if name.startswith("Tray_"):
+        base = name[len("Tray_") :]
+        if base in ("BlueCutDisc_Stack", "AccessHole"):
+            return "disc"
+        if base.startswith("InfoMarker_"):
+            return "marker"
+        if base == "EquipmentToken_Pair" or base.startswith("InfoToken_"):
+            return "token"
         return None
-    base = name[len("Tray_") :]
-    if base in ("BlueCutDisc_Stack", "AccessHole"):
-        return "disc"
-    if base.startswith("InfoMarker_"):
-        return "marker"
-    if base == "EquipmentToken_Pair" or base.startswith("InfoToken_"):
-        return "token"
+    if name.startswith("WireTray_"):
+        base = name[len("WireTray_") :]
+        if base == "AccessHole_Vertical":
+            return "wire_hole_vertical"
+        if base == "AccessHole_Horizontal":
+            return "wire_hole_horizontal"
+        if base.endswith("Pocket"):
+            return "wire_pocket"
+        if base in ("WireToken_Red", "WireToken_Yellow", "Card_Equipment_Double"):
+            return "wire_item"
+        return None
     return None
 
 
 # Every piece that gets the tray's outer fillet plus (where cut) its pockets'
-# top-face fillet -- currently the tray itself and its lid.
-_FILLET_TARGETS = ("TokenTray", "TokenTrayLid")
+# top-face fillet.
+_FILLET_TARGETS = ("TokenTray", "TokenTrayLid", "WireTray")
 
 
 def _fillet_tray_outer_edges(named_shapes):
@@ -1045,9 +1391,10 @@ def _fillet_tray_outer_edges(named_shapes):
     -------
     list of (str, Part.Shape)
         `named_shapes` with each target's 12 outer edges (top, bottom, and
-        vertical) filleted at ``_TRAY_OUTER_FILLET``. A target is left
-        unchanged if it isn't present in `named_shapes`, or if
-        ``_ENABLE_TRAY_FILLETS``/``_ENABLE_OUTER_EDGE_FILLETS`` is off.
+        vertical) filleted at its own :data:`_OUTER_FILLET_RADIUS`. A target is
+        left unchanged if it isn't present in `named_shapes`, or if
+        ``_ENABLE_TRAY_FILLETS``/``_ENABLE_OUTER_EDGE_FILLETS``/its own
+        :data:`_ENABLE_OUTER_FILLET_FOR` entry is off.
     """
     if not _ENABLE_TRAY_FILLETS or not _ENABLE_OUTER_EDGE_FILLETS:
         return named_shapes
@@ -1056,6 +1403,8 @@ def _fillet_tray_outer_edges(named_shapes):
 
     filleted = {}
     for target in _FILLET_TARGETS:
+        if not _ENABLE_OUTER_FILLET_FOR.get(target, True):
+            continue
         piece = shapes_by_name.get(target)
         if piece is None:
             continue
@@ -1071,7 +1420,8 @@ def _fillet_tray_outer_edges(named_shapes):
         z_max = piece.BoundBox.ZMax
 
         outer_edges = _box_corner_edges(piece, x_min, x_max, y_min, y_max, z_min, z_max)
-        filleted[target] = _fillet_edges_best_effort(piece, _TRAY_OUTER_FILLET, outer_edges)
+        radius = _OUTER_FILLET_RADIUS[target]
+        filleted[target] = _fillet_edges_best_effort(piece, radius, outer_edges)
 
     return [(name, filleted.get(name, shape)) for name, shape in named_shapes]
 
@@ -1093,7 +1443,8 @@ def _fillet_tray_top_rims(named_shapes):
         enabled (see :data:`_TOP_FILLET_CATEGORIES` and
         :func:`_tray_tool_category`) filleted at that category's own radius. A
         target is left unchanged if it isn't present in `named_shapes`, or if
-        ``_ENABLE_TRAY_FILLETS`` is off.
+        ``_ENABLE_TRAY_FILLETS``/its own :data:`_ENABLE_TOP_RIM_FILLET_FOR`
+        entry is off.
     """
     if not _ENABLE_TRAY_FILLETS:
         return named_shapes
@@ -1102,6 +1453,8 @@ def _fillet_tray_top_rims(named_shapes):
 
     filleted = {}
     for target in _FILLET_TARGETS:
+        if not _ENABLE_TOP_RIM_FILLET_FOR.get(target, True):
+            continue
         piece = shapes_by_name.get(target)
         if piece is None:
             continue
@@ -1146,6 +1499,16 @@ def _fillet_tray_top_rims(named_shapes):
                     for edge in top_edges
                     if _near(edge.Vertexes[0].Point.x, edge.Vertexes[-1].Point.x, 1e-6)
                 ]
+
+            if category == "wire_hole_horizontal":
+                # The hole's own circular rim is cut into arcs by the
+                # WALL_THICKNESS-wide walls separating it from the adjacent
+                # Red/Yellow/MiddlePocket cuts. Only the short straight chords
+                # across those thin walls -- the actual corners where the arc
+                # meets WireTray's own top face -- get filleted; the arcs
+                # themselves are excluded (filleting the arc itself is not
+                # what "corners" means here, and they don't fillet cleanly).
+                top_edges = [edge for edge in top_edges if _is_straight_edge(edge)]
 
             piece = _fillet_edges_best_effort(piece, radius, top_edges)
 

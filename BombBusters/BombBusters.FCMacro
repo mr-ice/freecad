@@ -39,11 +39,18 @@ if DOC_NAME in App.listDocuments():
     App.closeDocument(DOC_NAME)
 doc = App.newDocument(DOC_NAME)
 
+# Hidden on build: Tray_*/WireTray_* cutting tools (not meant to be seen),
+# WireToken_Blue_* (already has its own bag -- no box planned for it), the
+# box-level InfoToken/InfoMarker/EquipmentToken/BlueCutDisc originals now that
+# their Tray_-prefixed counterparts are actually housed in TokenTray, and
+# Card_Equipment now that Card_Equipment_Double supersedes it.
+_HIDDEN_PREFIXES = ("Tray_", "WireTray_", "WireToken_Blue_", "InfoToken_", "InfoMarker_")
+_HIDDEN_NAMES = {"EquipmentToken_Pair", "BlueCutDisc_Stack", "Card_Equipment"}
+
 for name, shape in tokens.build_all():
     obj = doc.addObject("Part::Feature", name)
     obj.Shape = shape
-    if name.startswith("Tray_") and obj.ViewObject is not None:
-        # Cutting tools for the TokenTray pocket cut, not meant to be seen.
+    if obj.ViewObject is not None and (name.startswith(_HIDDEN_PREFIXES) or name in _HIDDEN_NAMES):
         obj.ViewObject.Visibility = False
 
 box_obj = doc.addObject("Part::Feature", "Box_Reference")
