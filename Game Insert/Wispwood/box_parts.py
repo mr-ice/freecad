@@ -1,0 +1,560 @@
+"""FreeCAD reference solids for the loose box components + the leftover-space block.
+
+Models the game components as reference solids at real size and builds the **bottom organizer**
+by a subtractive method: start from a whole solid bottom box (:func:`_solid_lower_box`) and, for
+each part placed at its recorded position (``offsets.txt``), **burn a fitted pocket down from the
+top** (:func:`_pocket_cutter`) -- the leftover material forms the dividers. The markers + score
+pad stay in the kept **top tray** (see :mod:`box_insert`); the folded stand gets its own burned
+pocket. The old small tray is retired.
+
+Fungible multiples (solo tokens, cats, markers) are modelled as a single **stack** (the storage
+envelope) rather than separate pieces; the four outer map sections are separate objects. The
+irregular parts (outer map sections, paw, ruler/markers) use **outlines traced from photos** on
+Letter paper (see ``tools/trace_parts.py``); the rest come from sizes in :mod:`config`. Nothing
+here is a printed part — these are design references.
+
+Public API
+----------
+``build_perimeter_map``, ``build_center_map``, ``build_cards``, ``build_paw``,
+``build_solo_tokens``, ``build_cats``, ``build_markers``, ``build_scorepad``,
+``build_lower_space``, ``build_all``.
+"""
+
+import math
+
+import box_layout as bl
+import config as cfg
+import derived as d
+import Part
+import stand as st
+from FreeCAD import Vector
+
+# Folded-stand placement in the box (from offsets.txt), shared with BoxParts.FCMacro.
+STAND_OFFSET = (3.0, 110.5, 9.2)
+
+
+def _box(x, y, z, dx, dy, dz):
+    """Return an axis-aligned box solid with minimum corner ``(x, y, z)``."""
+    return Part.makeBox(dx, dy, dz, Vector(x, y, z))
+
+
+def _at_origin(shape):
+    """Translate ``shape`` so its bounding-box minimum corner sits at the origin."""
+    bb = shape.BoundBox
+    shape.translate(Vector(-bb.XMin, -bb.YMin, -bb.ZMin))
+    return shape
+
+
+def _octagon_face(ptp):
+    """Return a regular-octagon face (point-to-point ``ptp``), centred at the origin in Z = 0.
+
+    Vertices sit at 22.5 deg + k*45 deg, so the octagon has the usual flat top/bottom/sides.
+    """
+    r = ptp / 2.0  # circumradius (point-to-point = 2 r)
+    pts = [
+        Vector(
+            r * math.cos(math.radians(22.5 + 45 * k)),
+            r * math.sin(math.radians(22.5 + 45 * k)),
+            0.0,
+        )
+        for k in range(8)
+    ]
+    pts.append(pts[0])
+    return Part.Face(Part.makePolygon(pts))
+
+
+def _zcyl(r, h, x, y, z):
+    """Return a cylinder of radius ``r`` along ``+Z`` from ``(x, y, z)``."""
+    return Part.makeCylinder(r, h, Vector(x, y, z), Vector(0.0, 0.0, 1.0))
+
+
+def _profile_solid(points, thk):
+    """Extrude a closed 2-D outline (list of ``(x, y)`` mm) by ``thk`` in Z, bbox min at origin."""
+    pts = [Vector(x, y, 0.0) for x, y in points]
+    pts.append(pts[0])
+    return _at_origin(Part.Face(Part.makePolygon(pts)).extrude(Vector(0.0, 0.0, thk)))
+
+
+# --- Measured outlines (mm), traced from photos on Letter paper by tools/trace_parts.py ------
+# Each is a closed polygon with bbox minimum at the origin; the four outer map sections are
+# identical, so one profile is reused. Re-run the tracer to refresh these from new photos.
+_OUTER_MAP_PROFILE = [
+    (0.0, 49.5),
+    (13.0, 60.0),
+    (17.0, 54.0),
+    (37.8, 60.5),
+    (47.0, 75.0),
+    (42.8, 83.5),
+    (51.5, 90.2),
+    (96.2, 65.8),
+    (145.8, 79.5),
+    (153.0, 70.8),
+    (160.8, 75.0),
+    (176.5, 65.2),
+    (182.5, 51.2),
+    (182.0, 45.0),
+    (176.8, 40.8),
+    (186.2, 27.5),
+    (89.8, 0.0),
+]
+_PAW_PROFILE = [
+    (22.0, 1.2),
+    (17.2, 4.8),
+    (12.8, 13.5),
+    (4.5, 19.0),
+    (0.0, 28.8),
+    (2.0, 38.0),
+    (9.2, 46.5),
+    (11.5, 56.2),
+    (17.8, 63.0),
+    (25.5, 65.2),
+    (35.0, 64.0),
+    (46.2, 65.8),
+    (50.5, 64.5),
+    (56.8, 60.0),
+    (60.5, 53.5),
+    (61.2, 48.5),
+    (69.0, 40.2),
+    (71.2, 32.5),
+    (71.0, 27.5),
+    (67.5, 21.2),
+    (60.2, 16.2),
+    (57.5, 7.8),
+    (51.2, 1.8),
+    (46.2, 0.8),
+    (36.2, 3.0),
+    (29.5, 0.0),
+]
+_RULER_PROFILE = [
+    (0.0, 4.5),
+    (1.8, 14.8),
+    (17.0, 22.2),
+    (19.2, 34.5),
+    (195.8, 34.8),
+    (198.0, 21.5),
+    (210.2, 17.0),
+    (214.0, 11.2),
+    (213.0, 0.5),
+    (1.2, 0.0),
+]
+
+
+def build_perimeter_map():
+    """Return one outer map section, from the photo-traced quarter-octagon puzzle outline.
+
+    Returns
+    -------
+    Part.Shape
+        The board-section solid (bbox min at the origin), ~186 x 90 mm.
+    """
+    return _profile_solid(_OUTER_MAP_PROFILE, cfg.BOARD_THICKNESS)
+
+
+def build_outer_map_stack():
+    """Return the four identical outer map sections as a single stacked solid (~186 x 90 mm)."""
+    return _profile_solid(_OUTER_MAP_PROFILE, 4 * cfg.BOARD_THICKNESS)
+
+
+def build_center_map():
+    """Return the inner map section: an octagon (``BOARD_CENTER_PTP`` ptp) with scalloped edges.
+
+    Each of the 8 sides bows inward by ``BOARD_CENTER_WAVE`` (a circular arc through the side
+    midpoint pulled toward the centre), matching the wavy printed edge so an insert can hug it.
+
+    Returns
+    -------
+    Part.Shape
+        The center-octagon solid (bbox min at the origin).
+    """
+    r = cfg.BOARD_CENTER_PTP / 2.0
+    s = cfg.BOARD_CENTER_WAVE
+    verts = [
+        Vector(
+            r * math.cos(math.radians(22.5 + 45 * k)),
+            r * math.sin(math.radians(22.5 + 45 * k)),
+            0.0,
+        )
+        for k in range(8)
+    ]
+    edges = []
+    for k in range(8):
+        a, b = verts[k], verts[(k + 1) % 8]
+        mid = (a + b) * 0.5
+        midp = mid * ((mid.Length - s) / mid.Length)  # pull the side midpoint inward
+        edges.append(Part.Arc(a, midp, b).toShape())
+    face = Part.Face(Part.Wire(edges))
+    return _at_origin(face.extrude(Vector(0.0, 0.0, cfg.BOARD_THICKNESS)))
+
+
+def build_cards():
+    """Return the card deck (unsleeved) as a solid block."""
+    return _box(0.0, 0.0, 0.0, cfg.CARD_W, cfg.CARD_H, cfg.CARD_DECK_THICKNESS)
+
+
+def build_paw():
+    """Return the 1st-player paw token, from the photo-traced cat-paw outline (~71 x 66 mm)."""
+    return _profile_solid(_PAW_PROFILE, cfg.PAW_THICKNESS)
+
+
+def build_solo_tokens():
+    """Return the 8 solo tokens as a single roll lying on its side (cylinder axis horizontal).
+
+    The disks stand vertically (faces in the Y-Z plane), rolled along X -- so the storage
+    envelope is a horizontal cylinder cradled in a trough (see :func:`_roll_pocket`).
+    """
+    h = cfg.ROUND_TOKEN_COUNT * cfg.ROUND_TOKEN_THICKNESS
+    roll = Part.makeCylinder(cfg.ROUND_TOKEN_DIA / 2.0, h, Vector(0.0, 0.0, 0.0), Vector(1, 0, 0))
+    return _at_origin(roll)
+
+
+def build_cats():
+    """Return the 6 cat tokens stored ON EDGE: 35x35 faces vertical, rowed along the thickness."""
+    row = cfg.CAT_COUNT * cfg.CAT_THICKNESS  # row length (along the stacked thickness)
+    return _box(0.0, 0.0, 0.0, cfg.CAT_SIZE, row, cfg.CAT_SIZE)
+
+
+def build_markers():
+    """Return the 4 markers (rulers/solo board) as a stack, using the photo-traced ruler outline.
+
+    The markers are the ~214 x 35 mm number-track standees; modelled as one ruler profile
+    extruded to the 4-piece stack thickness (the storage envelope).
+    """
+    return _profile_solid(_RULER_PROFILE, cfg.MARKER_COUNT * cfg.MARKER_THICKNESS)
+
+
+def build_scorepad():
+    """Return the score pad as a solid block."""
+    return _box(0.0, 0.0, 0.0, cfg.SCOREPAD_W, cfg.SCOREPAD_H, cfg.SCOREPAD_THICKNESS)
+
+
+def build_lower_space():
+    """Return the LOWER space: the bottom layer (Z 0..tray top) beside the Wispwood tray.
+
+    The box footprint minus the tray, up to the tray's wall top -- the chunky bits (cats on
+    edge, cards, solo tokens) and the folded stand live here. The tray's whole front band is
+    cut across the FULL box width, so no thin sliver is left beside the tray.
+    """
+    r = bl.bottom_regions()["wispwood"]
+    c = cfg.COMPONENT_CLEARANCE
+    block = _box(0.0, 0.0, 0.0, cfg.BOX_W, cfg.BOX_L, d.WALL_TOP)
+    cut = _box(-1.0, r.y - c, -1.0, cfg.BOX_W + 2.0, r.h + 2 * c, d.WALL_TOP + 2.0)
+    block = block.cut(cut)
+    # Fillet the two back vertical corners (which sit in the box's rounded interior corners).
+    rr = cfg.BOX_CORNER_R
+    corners = []
+    for e in block.Edges:
+        bb = e.BoundBox
+        vertical = abs(bb.ZLength - d.WALL_TOP) < 1e-6 and bb.XLength < 0.5 and bb.YLength < 0.5
+        at_back = abs(bb.YMax - cfg.BOX_L) < 0.5
+        at_side = abs(bb.XMin) < 0.5 or abs(bb.XMax - cfg.BOX_W) < 0.5
+        if vertical and at_back and at_side:
+            corners.append(e)
+    if corners:
+        block = block.makeFillet(rr, corners)
+    return block
+
+
+def _solid_lower_box():
+    """Return the whole solid bottom box (back region, box-corner rounded) to carve pockets from."""
+    r = bl.bottom_regions()["wispwood"]
+    c = cfg.COMPONENT_CLEARANCE
+    y0 = r.y + r.h + c  # front edge of the back region (facing the Wispwood tray)
+    rr = cfg.BOX_CORNER_R
+    h = d.WALL_TOP
+    box = _box(0.0, y0, 0.0, cfg.BOX_W, cfg.BOX_L - y0, h)
+    # Round the two back outer corners to the box's interior radius (cut the sharp bit).
+    for cx in (0.0, cfg.BOX_W):
+        ccx = cx + rr if cx == 0.0 else cx - rr
+        sq_x = 0.0 if cx == 0.0 else cx - rr
+        sq = _box(sq_x, cfg.BOX_L - rr, -1.0, rr, rr, h + 2.0)
+        box = box.cut(sq.cut(_zcyl(rr, h + 2.0, ccx, cfg.BOX_L - rr, -1.0)))
+    return box
+
+
+def _pocket_cutter(solid, top_z, clr):
+    """Return a 'router-from-the-top' cutter for ``solid``: its outer perimeter up to ``top_z``.
+
+    Takes only the OUTER boundary of the part's footprint (inner holes are filled -- a router
+    cutting from the top clears them, and any inner geometry would only occlude dropping the part
+    in), grows it by ``clr``, and extrudes it up through the top -- so subtracting it from the box
+    leaves a clean part-shaped pocket, open at the top and bottomed where the part rests.
+    """
+    bb = solid.BoundBox
+    zmin = bb.ZMin
+    up = Vector(0.0, 0.0, top_z - zmin + 1.0)
+    faces = [f for f in solid.Faces if abs(f.CenterOfMass.z - zmin) < 0.1]
+    cut = None
+    for f in faces:
+        try:
+            face = Part.Face(f.OuterWire)  # outer perimeter only (fill inner holes)
+        except Exception:
+            face = f
+        if clr:
+            try:
+                face = face.makeOffset2D(clr)
+            except Exception:
+                pass
+        try:
+            prism = face.extrude(up)
+        except Exception:
+            continue
+        cut = prism if cut is None else cut.fuse(prism)
+    if cut is None:  # fallback: bounding-box prism
+        cut = _box(bb.XMin, bb.YMin, zmin, bb.XLength, bb.YLength, top_z - zmin + 1.0)
+    return cut
+
+
+def _footprint_prism(solid):
+    """Return a thin solid of ``solid``'s footprint at Z=0 (or None).
+
+    Sections the solid with a thin slab at mid-thickness (so round rods/ears -- whose flat bottom
+    is only a tangent line -- are captured at full width), fills the largest section face to its
+    outer perimeter, and re-extrudes it as a thin prism at Z=0 for robust union with other parts.
+    """
+    bb = solid.BoundBox
+    z = bb.ZMin + cfg.ALT_PART_T / 2.0
+    slab = _box(bb.XMin - 1.0, bb.YMin - 1.0, z - 0.5, bb.XLength + 2.0, bb.YLength + 2.0, 1.0)
+    sect = solid.common(slab)
+    horiz = [f for f in sect.Faces if f.BoundBox.ZLength < 0.01]
+    if not horiz:
+        return None
+    face = Part.Face(max(horiz, key=lambda f: f.Area).OuterWire)
+    face.translate(Vector(0.0, 0.0, -face.BoundBox.ZMin))  # to Z=0
+    return face.extrude(Vector(0.0, 0.0, 1.0))
+
+
+def _stand_silhouette(grow):
+    """Return the combined shelf+base outer outline as a grown FACE (rounded corners preserved).
+
+    Each part's footprint prism follows its actual rod outlines; the prisms are FUSED into one
+    solid (filling the gap between the parts) and merged with ``removeSplitter`` so the whole
+    union becomes a single region, whose bottom outer wire -- offset outward by ``grow`` -- is the
+    closed, fillet-following outline the folded stand drops into.
+    """
+    ox, oy, oz = STAND_OFFSET
+    solid = None
+    for name, shape, *_rest in st.build_all():
+        if name not in ("StandShelf", "StandBase"):
+            continue
+        shape.translate(Vector(ox - st.DISPLAY_X_OFFSET, oy, oz))
+        prism = _footprint_prism(shape)
+        if prism is not None:
+            solid = prism if solid is None else solid.fuse(prism)
+    if solid is None:
+        return None
+    solid = solid.removeSplitter()
+    zmin = solid.BoundBox.ZMin
+    bottoms = [f for f in solid.Faces if abs(f.CenterOfMass.z - zmin) < 0.01]
+    outer = Part.Face(max(bottoms, key=lambda f: f.Area).OuterWire)
+    try:
+        outer = outer.makeOffset2D(grow)
+    except Exception:
+        pass
+    outer.translate(Vector(0.0, 0.0, oz - outer.BoundBox.ZMin))  # to the stand's resting Z
+    return outer
+
+
+def _stadium_cut(cx, cy, span, r, z, h, axis="x"):
+    """Return a vertical obround cutter: a box of length ``span`` with a cap at each end.
+
+    Two hemicylinders (radius ``r``) flank a central box, centred at ``(cx, cy)`` and rising
+    ``h`` from ``z`` -- a wide rounded finger scoop rather than a single hemicylinder. ``axis``
+    selects whether the span runs along X (default) or Y.
+    """
+    half = span / 2.0
+    if axis == "y":
+        cut = _box(cx - r, cy - half, z, 2.0 * r, span, h)
+        c0, c1 = (cx, cy - half), (cx, cy + half)
+    else:
+        cut = _box(cx - half, cy - r, z, span, 2.0 * r, h)
+        c0, c1 = (cx - half, cy), (cx + half, cy)
+    cut = cut.fuse(_zcyl(r, h, c0[0], c0[1], z))
+    return cut.fuse(_zcyl(r, h, c1[0], c1[1], z))
+
+
+def _roll_pocket(solid, top_z, clr):
+    """Return a pocket for a horizontal cylindrical roll: a cradle cylinder + an open-top box.
+
+    The roll's horizontal axis is the bbox dimension that differs from the other two (which equal
+    the diameter, the vertical one being Z). The lower half is cradled in a clearance cylinder; a
+    box from the roll centreline up through ``top_z`` opens the top so the roll drops in and lifts
+    straight out.
+    """
+    bb = solid.BoundBox
+    dia = bb.ZLength  # lying down: the vertical extent is the diameter
+    r = dia / 2.0 + clr
+    cz = bb.Center.z
+    up = top_z - cz + 1.0
+    along_x = abs(bb.XLength - dia) > abs(bb.YLength - dia)  # the longer-vs-diameter horizontal dim
+    if along_x:
+        cy = bb.Center.y
+        cradle = Part.makeCylinder(
+            r, bb.XLength + 2 * clr, Vector(bb.XMin - clr, cy, cz), Vector(1, 0, 0)
+        )
+        lift = _box(bb.XMin - clr, cy - r, cz, bb.XLength + 2 * clr, 2 * r, up)
+    else:
+        cx = bb.Center.x
+        cradle = Part.makeCylinder(
+            r, bb.YLength + 2 * clr, Vector(cx, bb.YMin - clr, cz), Vector(0, 1, 0)
+        )
+        lift = _box(cx - r, bb.YMin - clr, cz, 2 * r, bb.YLength + 2 * clr, up)
+    return cradle.fuse(lift)
+
+
+def build_bottom_tray(components, stand_sil):
+    """Return the bottom box with a fitted pocket burned down from the top for every part.
+
+    Starts from the whole solid bottom box and subtracts each part's outer-perimeter footprint
+    (extruded from its resting Z up through the top) -- the parts drop in from above and the
+    leftover material forms the dividers. The solo-token roll gets a cradle-and-open-top trough
+    (:func:`_roll_pocket`); the stand uses its combined shelf+base silhouette (``stand_sil``).
+    Also cuts a deep front finger scoop to lift the Wispwood tray out.
+    """
+    box = _solid_lower_box()
+    bbs = {}
+    for name, shape, _rgb in components:
+        bbs[name] = shape.BoundBox
+        cutter = _roll_pocket if name == "SoloTokensx8" else _pocket_cutter
+        try:
+            box = box.cut(cutter(shape, d.WALL_TOP, cfg.STAND_BAY_CLEAR))
+        except Exception:
+            pass
+    if stand_sil is not None:  # combined shelf+base outline pocket
+        try:
+            zmin = stand_sil.BoundBox.ZMin
+            box = box.cut(stand_sil.extrude(Vector(0.0, 0.0, d.WALL_TOP - zmin + 1.0)))
+        except Exception:
+            pass
+    r = bl.bottom_regions()["wispwood"]
+    y0 = r.y + r.h + cfg.COMPONENT_CLEARANCE
+    fr = cfg.FINGER_SCOOP_R
+    # The front tray scoop cuts full depth (it lifts the whole Wispwood tray out).
+    box = box.cut(
+        _stadium_cut(r.x + r.w / 2.0, y0, cfg.FINGER_SCOOP_SPAN, fr, -0.5, d.WALL_TOP + 1.0)
+    )
+    # Retrieval scoops are SHALLOW (cut only the top FINGER_SCOOP_DEPTH off the rim) so the loose
+    # parts can't drop into them: one bridging the gap between the cards and solo tokens (spans Y
+    # between their pockets), one across the front end of the cat-token row.
+    sz = d.WALL_TOP - cfg.FINGER_SCOOP_DEPTH  # shallow-scoop floor
+    sh = cfg.FINGER_SCOOP_DEPTH + 1.0
+    cards, solo, cats = bbs.get("Cards"), bbs.get("SoloTokensx8"), bbs.get("CatTokensx6")
+    if cards is not None and solo is not None:
+        gx = (max(cards.XMin, solo.XMin) + min(cards.XMax, solo.XMax)) / 2.0
+        gy0, gy1 = min(cards.YMax, solo.YMax), max(cards.YMin, solo.YMin)
+        box = box.cut(_stadium_cut(gx, (gy0 + gy1) / 2.0, gy1 - gy0, fr, sz, sh, axis="y"))
+    if cats is not None:
+        cx = (cats.XMin + cats.XMax) / 2.0
+        # Keep the total X width (span + 2*r) within the cat bay so the cats stay seated.
+        cat_span = max(cats.XLength * 0.8 - 2.0 * fr, 0.0)
+        box = box.cut(_stadium_cut(cx, cats.YMin, cat_span, fr, sz, sh))
+    return box
+
+
+def _placed(name, shape, x, y, z, rgb, rot=0.0):
+    """Return a part tuple with ``shape`` rotated ``rot`` deg about Z, bbox min moved to (x,y,z)."""
+    if rot:
+        shape.rotate(Vector(0.0, 0.0, 0.0), Vector(0.0, 0.0, 1.0), rot)
+    shape = _at_origin(shape)
+    shape.translate(Vector(x, y, z))
+    return (name, shape, rgb, True, 0)
+
+
+def _shape_at(shape, x, y, z, r):
+    """Return ``shape`` under a FreeCAD placement: rotate ``r`` deg about Z origin, then translate.
+
+    Reproduces the recorded manual positions in ``offsets.txt`` (placement = Z rotation about the
+    origin + base translation).
+    """
+    if r:
+        shape.rotate(Vector(0.0, 0.0, 0.0), Vector(0.0, 0.0, 1.0), r)
+    shape.translate(Vector(x, y, z))
+    return shape
+
+
+def _shape_centered(shape, cx, cy, z):
+    """Return ``shape`` with its bbox centre in XY at ``(cx, cy)`` and its bottom at ``z``."""
+    bb = shape.BoundBox
+    shape.translate(Vector(cx - bb.Center.x, cy - bb.Center.y, z - bb.ZMin))
+    return shape
+
+
+def _bottom_components():
+    """Return the bottom-layer parts as ``(name, placed_solid, rgb)`` at the recorded positions.
+
+    The map outer stack, map centre and 1st-player paw were too small for careful bottom pockets
+    and move to the top box (see :func:`_top_loose_components`).
+    """
+    return [
+        ("Cards", _shape_at(build_cards(), 119.800, 98.500, 33.000, 0.0), (0.85, 0.75, 0.45)),
+        ("CatTokensx6", _shape_at(build_cats(), 13.300, 223.200, 5.800, 0.0), (0.70, 0.50, 0.80)),
+        (
+            "SoloTokensx8",  # roll on its side (axis along Y), raised so its top sits at the rim
+            _shape_at(
+                build_solo_tokens(),
+                151.400,
+                216.000,
+                d.WALL_TOP - cfg.ROUND_TOKEN_DIA,
+                90.0,
+            ),
+            (0.55, 0.55, 0.85),
+        ),
+    ]
+
+
+def _top_loose_components():
+    """Return the three parts that ride loose in the TOP box (too small for careful pockets).
+
+    The outer-map stack, scalloped map centre and 1st-player paw lie loose on the top tray; shown
+    centred and stacked for fit review (reposition manually, like the others).
+    """
+    ztop = cfg.SMALL_TRAY_RIM_Z + cfg.TOP_TRAY_DEPTH
+    cx, cy = cfg.BOX_W / 2.0, cfg.BOX_L / 2.0
+    mapo = build_outer_map_stack()
+    mapo.rotate(Vector(0.0, 0.0, 0.0), Vector(0.0, 0.0, 1.0), 90.0)  # long axis along Y to fit
+    return [
+        ("MapOuterStack", _shape_centered(mapo, cx, cy, ztop), (0.45, 0.65, 0.45)),
+        ("MapCenter", _shape_centered(build_center_map(), cx, cy, ztop), (0.30, 0.55, 0.30)),
+        ("PawToken", _shape_centered(build_paw(), cx, cy, ztop), (0.85, 0.55, 0.55)),
+    ]
+
+
+def build_all():
+    """Build the bottom tray + every component at the recorded manual positions (offsets.txt).
+
+    The bottom-layer contents (outer-map stack, center, cards, paw, cats, solo tokens) are placed
+    at the positions recorded after manual arrangement; the markers + score pad stay in the kept
+    top tray (not recorded). Each recorded position is a FreeCAD placement (Z rotation about the
+    origin + base translation); the center octagon is placed by its centre.
+
+    Returns
+    -------
+    list of tuple
+        ``(name, shape, (r, g, b), visible, transparency)``.
+    """
+    comps = _bottom_components()
+    stand_sil = _stand_silhouette(cfg.STAND_BAY_CLEAR)
+    tray = build_bottom_tray(comps, stand_sil)
+    parts = [("BottomTray", tray, (0.55, 0.6, 0.6), True, 30)]
+    # Show the seated parts in their burned-down pockets.
+    for name, shape, rgb in comps:
+        parts.append((name, shape, rgb, True, 0))
+    # Show the combined shelf+base outline (grown) as a wire for review.
+    if stand_sil is not None:
+        parts.append(("StandSilhouette", stand_sil.OuterWire, (1.0, 0.0, 0.0), True, 0))
+
+    # --- Top tray: markers + score pad in the two bays (not in offsets.txt) --------------------
+    tz = cfg.SMALL_TRAY_RIM_Z + cfg.INSERT_FLOOR  # top-tray pocket floor
+    bp = bl.top_regions()["board_pocket"]
+    mt = bl.top_regions()["marker_trough"]
+    parts.append(
+        _placed("ScorePad", build_scorepad(), bp.x + 2.0, bp.y + 2.0, tz, (0.80, 0.80, 0.60))
+    )
+    parts.append(
+        _placed(
+            "Markersx4", build_markers(), mt.x + 1.0, mt.y + 1.0, tz, (0.50, 0.75, 0.80), rot=90.0
+        )
+    )
+    # The three parts too small for careful bottom pockets ride loose in the top box.
+    for name, shape, rgb in _top_loose_components():
+        parts.append((name, shape, rgb, True, 0))
+    return parts

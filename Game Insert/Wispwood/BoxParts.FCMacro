@@ -1,0 +1,83 @@
+"""FreeCAD macro: show the loose box components + the leftover-space block.
+
+Run inside FreeCAD 1.0.2. Reloads the project's modules, recreates the document, and shows the
+box-interior reference shell, the Wispwood tray in place (transparent, for context), the
+leftover block (box minus tray), and every game component laid out in a palette beside the box,
+for designing the new organizer. Sets an isometric, fit-all view.
+"""
+
+import importlib
+import os
+import sys
+
+import FreeCAD as App
+import FreeCADGui as Gui
+
+DOC_NAME = "WispwoodBoxParts"
+
+try:
+    _macro_dir = os.path.dirname(os.path.abspath(__file__))
+except NameError:  # __file__ is undefined in some macro contexts
+    _macro_dir = (
+        os.path.dirname(os.path.abspath(App.ActiveDocument.FileName))
+        if App.ActiveDocument
+        else os.getcwd()
+    )
+if _macro_dir not in sys.path:
+    sys.path.insert(0, _macro_dir)
+
+import config  # noqa: E402
+
+importlib.reload(config)
+import derived  # noqa: E402
+
+importlib.reload(derived)
+import box_layout  # noqa: E402
+
+importlib.reload(box_layout)
+import wispwood  # noqa: E402
+
+importlib.reload(wispwood)
+import stand  # noqa: E402
+
+importlib.reload(stand)
+import box_insert  # noqa: E402
+
+importlib.reload(box_insert)
+import box_parts  # noqa: E402
+
+importlib.reload(box_parts)
+
+if DOC_NAME in App.listDocuments():
+    App.closeDocument(DOC_NAME)
+doc = App.newDocument(DOC_NAME)
+
+# Tray in place (transparent, for context) + box-interior reference shell + the components/block.
+tray = [
+    (name, shape, rgb, True, 80)
+    for name, shape, rgb, _v, _t in box_insert.place_wispwood(wispwood.build_all())
+]
+# Top tray + box-reference shell (box_insert.build_all), the folded stand, and the bottom-space
+# model (box_parts). We design the organizer in the bottom space; the top tray is kept.
+insert = list(box_insert.build_all())
+# Folded stand at the recorded manual position (box_parts.STAND_OFFSET): native stand (minus the
+# display offset) translated to the box.
+ox, oy, oz = box_parts.STAND_OFFSET
+folded_stand = []
+for name, shape, rgb, visible, transparency in stand.build_all():
+    shape.translate(App.Vector(ox - stand.DISPLAY_X_OFFSET, oy, oz))
+    folded_stand.append((name, shape, rgb, visible, transparency))
+parts = tray + insert + folded_stand + list(box_parts.build_all())
+
+for name, shape, rgb, visible, transparency in parts:
+    obj = doc.addObject("Part::Feature", name)
+    obj.Shape = shape
+    if obj.ViewObject is not None:
+        obj.ViewObject.ShapeColor = rgb
+        obj.ViewObject.Visibility = visible
+        obj.ViewObject.Transparency = transparency
+
+doc.recompute()
+
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")

@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="620" font-family="Helvetica, Arial, sans-serif">
+  <style>
+    .table { stroke:#444; stroke-width:2.5; }
+    .part  { fill:#e7d7b8; stroke:#9a7b35; stroke-width:2; }
+    .base  { fill:#cdeee0; stroke:#1a8a63; stroke-width:2; }
+    .lip   { fill:#cfe0ff; stroke:#3a66c4; stroke-width:2; }
+    .knuck { fill:#fff; stroke:#222; stroke-width:2; }
+    .bad   { fill:none; stroke:#c1121f; stroke-width:2.5; }
+    .badf  { fill:#f6c9cd; stroke:#c1121f; stroke-width:2; }
+    .axis  { fill:#222; }
+    .ttl   { font-size:15px; font-weight:bold; }
+    .sub   { font-size:13px; font-weight:bold; }
+    .lbl   { font-size:11px; fill:#222; }
+    .rd    { font-size:11px; fill:#c1121f; font-weight:bold; }
+    .gn    { font-size:11px; fill:#178a3a; font-weight:bold; }
+    .dash  { stroke:#999; stroke-width:1; stroke-dasharray:4 3; }
+  </style>
+
+  <text x="20" y="24" class="ttl">Hinge cross-sections (side view, Z up) — flattened rod vs round knuckle</text>
+
+  <!-- ===================== Panel A: shelf/base hinge ===================== -->
+  <text x="20" y="56" class="sub">#3  Shelf ↔ base hinge</text>
+
+  <!-- A-left: NOW -->
+  <g transform="translate(40,70)">
+    <text x="0" y="0" class="rd">NOW — flattened rod</text>
+    <line class="table" x1="-20" y1="150" x2="230" y2="150"/>
+    <text x="180" y="164" class="lbl">table (Z=0)</text>
+    <!-- base flat bar Z[0,56px] -->
+    <rect class="base" x="-20" y="94" width="180" height="56"/>
+    <text x="-14" y="124" class="lbl">base (flat)</text>
+    <!-- hinge axis -->
+    <circle class="axis" cx="120" cy="122" r="4"/>
+    <!-- shelf flattened cross-section rotated 75deg about axis: a 72x56 rect, one corner below table -->
+    <g transform="rotate(-75 120 122)">
+      <rect class="badf" x="84" y="94" width="120" height="56"/>
+    </g>
+    <line class="dash" x1="120" y1="150" x2="120" y2="200"/>
+    <path class="bad" d="M118 184 q-14 -6 -12 -22"/>
+    <text x="40" y="210" class="rd">flat lower-front corner swings BELOW the table /</text>
+    <text x="40" y="224" class="rd">past the base bottom as the shelf tips up</text>
+  </g>
+
+  <!-- A-right: FIX -->
+  <g transform="translate(470,70)">
+    <text x="0" y="0" class="gn">FIX — round Ø7 knuckle, no material in front of the axis</text>
+    <line class="table" x1="-20" y1="150" x2="280" y2="150"/>
+    <rect class="base" x="-20" y="94" width="150" height="56"/>
+    <text x="-14" y="124" class="lbl">base + forward foot</text>
+    <!-- round knuckle Ø56px tangent to table, centre Z=28 -->
+    <circle class="knuck" cx="120" cy="122" r="28"/>
+    <circle class="axis" cx="120" cy="122" r="3"/>
+    <!-- shelf bar tilted up 75deg, starting AT the axis, extends +Y only -->
+    <g transform="rotate(-75 120 122)">
+      <rect class="part" x="120" y="94" width="120" height="56"/>
+    </g>
+    <text x="150" y="60" class="gn">round knuckle rotates in place →</text>
+    <text x="150" y="74" class="gn">stays within Z[0,7], never dips</text>
+    <text x="6" y="210" class="lbl">shelf carries NO material ahead of the axis;</text>
+    <text x="6" y="224" class="lbl">the base's forward foot lives there instead.</text>
+  </g>
+
+  <!-- ===================== Panel B: leg/shelf hinge ===================== -->
+  <text x="20" y="340" class="sub">#4  Leg ↔ shelf hinge vs the lip</text>
+
+  <!-- B-left: NOW -->
+  <g transform="translate(40,360)">
+    <text x="0" y="0" class="rd">NOW — leg hinge ON the lip crossbar</text>
+    <!-- shelf part plane Z[0,56] -->
+    <rect class="part" x="-20" y="94" width="240" height="56"/>
+    <text x="-14" y="180" class="lbl">shelf crossbar (Z 0..7)</text>
+    <!-- lip rising above at +Z, +Y -->
+    <rect class="lip" x="150" y="40" width="40" height="54"/>
+    <text x="158" y="34" class="lbl">lip</text>
+    <!-- leg hinge cross-section at same Y as lip, corner sweeping up into lip -->
+    <circle class="axis" cx="150" cy="122" r="4"/>
+    <g transform="rotate(-35 150 122)"><rect class="badf" x="150" y="94" width="60" height="56"/></g>
+    <path class="bad" d="M168 86 q10 -8 22 -2"/>
+    <text x="0" y="210" class="rd">the leg's corner sweeps up into the lip;</text>
+    <text x="0" y="224" class="rd">built coplanar &amp; touching → they fuse.</text>
+  </g>
+
+  <!-- B-right: FIX -->
+  <g transform="translate(470,360)">
+    <text x="0" y="0" class="gn">FIX — own hinge bar, offset + round, clear of the lip</text>
+    <rect class="part" x="-20" y="94" width="260" height="56"/>
+    <!-- lip -->
+    <rect class="lip" x="60" y="40" width="40" height="54"/>
+    <text x="66" y="34" class="lbl">lip</text>
+    <!-- separate leg-hinge bar offset in +Y from the lip, with a gap -->
+    <circle class="knuck" cx="170" cy="122" r="28"/>
+    <circle class="axis" cx="170" cy="122" r="3"/>
+    <g transform="rotate(-35 170 122)"><rect class="part" x="170" y="94" width="60" height="56"/></g>
+    <line class="dash" x1="100" y1="70" x2="142" y2="70"/>
+    <text x="96" y="64" class="gn">gap</text>
+    <text x="0" y="210" class="lbl">leg hinge on a dedicated bar, round knuckle,</text>
+    <text x="0" y="224" class="lbl">set clear of the lip; lock recomputes from it.</text>
+  </g>
+</svg>

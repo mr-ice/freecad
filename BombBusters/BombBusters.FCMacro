@@ -1,4 +1,4 @@
-"""FreeCAD macro: build the Wispwood tile holder.
+"""FreeCAD macro: build the BombBusters token/card/marker reference shapes.
 
 Run inside FreeCAD 1.0.2. Reloads the project's Python modules so edits take effect
 without restarting FreeCAD, recreates the document from scratch, builds the parts, and
@@ -12,7 +12,7 @@ import sys
 import FreeCAD as App
 import FreeCADGui as Gui
 
-DOC_NAME = "Wispwood"
+DOC_NAME = "BombBusters"
 
 # Make sure the project directory (this macro's folder) is importable.
 try:
@@ -30,39 +30,33 @@ if _macro_dir not in sys.path:
 import config  # noqa: E402
 
 importlib.reload(config)
-import derived  # noqa: E402
+import tokens  # noqa: E402
 
-importlib.reload(derived)
-import wispwood  # noqa: E402
-
-importlib.reload(wispwood)
-import stand  # noqa: E402
-
-importlib.reload(stand)
-import box_layout  # noqa: E402
-
-importlib.reload(box_layout)
-import box_insert  # noqa: E402
-
-importlib.reload(box_insert)
+importlib.reload(tokens)
 
 # Recreate the document from scratch.
 if DOC_NAME in App.listDocuments():
     App.closeDocument(DOC_NAME)
 doc = App.newDocument(DOC_NAME)
 
-parts = (
-    list(box_insert.place_wispwood(wispwood.build_all()))
-    + list(box_insert.place_stand(stand.build_all()))
-    + list(box_insert.build_all())
-)
-for name, shape, rgb, visible, transparency in parts:
+# Hidden on build: Tray_*/WireTray_* cutting tools (not meant to be seen),
+# WireToken_Blue_* (already has its own bag -- no box planned for it), the
+# box-level InfoToken/InfoMarker/EquipmentToken/BlueCutDisc originals now that
+# their Tray_-prefixed counterparts are actually housed in TokenTray, and
+# Card_Equipment now that Card_Equipment_Double supersedes it.
+_HIDDEN_PREFIXES = ("Tray_", "WireTray_", "WireToken_Blue_", "InfoToken_", "InfoMarker_")
+_HIDDEN_NAMES = {"EquipmentToken_Pair", "BlueCutDisc_Stack", "Card_Equipment"}
+
+for name, shape in tokens.build_all():
     obj = doc.addObject("Part::Feature", name)
     obj.Shape = shape
-    if obj.ViewObject is not None:
-        obj.ViewObject.ShapeColor = rgb
-        obj.ViewObject.Visibility = visible
-        obj.ViewObject.Transparency = transparency
+    if obj.ViewObject is not None and (name.startswith(_HIDDEN_PREFIXES) or name in _HIDDEN_NAMES):
+        obj.ViewObject.Visibility = False
+
+box_obj = doc.addObject("Part::Feature", "Box_Reference")
+box_obj.Shape = tokens.build_box()
+if box_obj.ViewObject is not None:
+    box_obj.ViewObject.Transparency = 80
 
 doc.recompute()
 

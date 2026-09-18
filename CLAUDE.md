@@ -38,6 +38,12 @@ general rules never have to be repeated per project. See [Projects](#projects) b
 
 - Lint and format all Python with **`ruff check`** and **`ruff format`**.
 
+## Git / commits
+
+- **Don't repeatedly prompt to commit.** After finishing a change, do not end with a
+  "want me to commit?" question. Commit (or push) only when the user explicitly asks; until
+  then, just leave the changes pending without asking each turn.
+
 ## Projects
 
 Each subproject keeps its own design intent and specific parameters (sizes, tolerances,
@@ -52,3 +58,5 @@ together with this file. Add new projects to this list as they gain a `PROJECT.m
   clips and labels.
 - [Game Insert/Wispwood](Game%20Insert/Wispwood/PROJECT.md) — two-stack Wispwood tile rack
   with a two-part sliding/dispensing lid and an integrated folding stand.
+- [BombBusters](BombBusters/PROJECT.md) — reference geometry for BombBusters game
+  components (tokens, markers, discs, cards) and the box envelope, for layout planning.
