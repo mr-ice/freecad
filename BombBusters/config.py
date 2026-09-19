@@ -24,12 +24,21 @@ InfoToken = {
     "Z": "Height",
 }
 
+# Tokens from SecretMission Boxes
+SecretMissionTokens = {
+    "Height": 21.25,
+    "Width": 14,
+    "Thickness": 3.15,
+    "Quantity": {"X": 5, "x1": 8, "x2": 8, "x3": 5, "even": 11, "odd": 11},
+    "Z": "Width",
+}
+
 # EquipmentTokens (!=, ==)
 EquipmentToken = {"Height": 21.15, "Width": 29.75, "Thickness": 3.15, "Quantity": 2, "Z": "Height"}
 
 # Markers
 InfoMarker = {
-    "Red": {"Diameter": 8, "Height": 12, "Quantity": 3},
+    "Red": {"Diameter": 8, "Height": 12, "Quantity": 4},
     "Yellow": {"Width": 8, "Height": 12, "Quantity": 4},
     "Z": "Height",
 }
@@ -63,6 +72,12 @@ Box = {
     "Z": "Depth",
 }
 
+# Secret Mission boxes come in large and smal
+SecretMissionBox = {"Height": 129.0, "Width": 86.0, "Depth": 19.0, "Z": "Depth"}
+
+SecretMissionBoxL = SecretMissionBox.copy()
+SecretMissionBoxL["Width"] = SecretMissionBox["Width"] * 3 / 2
+
 # TokenTray holds the cut discs, infomarkers, and all info tokens
 TokenTray = {
     "Height": 111,
@@ -74,3 +89,12 @@ TokenTray = {
 # Overall
 WALL_THICKNESS = 1.5
 TOLERANCE = 0.75
+
+# SecretMissionTray: fits inside the (Small) SecretMissionBox, walls raised to
+# that box's own interior depth.
+SecretMissionTray = {
+    "Height": SecretMissionBox["Height"] - TOLERANCE,
+    "Width": SecretMissionBox["Width"] - TOLERANCE,
+    "Depth": SecretMissionBox["Depth"],
+    "Z": "Depth",
+}
