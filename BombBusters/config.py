@@ -24,6 +24,22 @@ InfoToken = {
     "Z": "Height",
 }
 
+# Tokens from SecretMission Boxes
+SecretMissionTokens = {
+    "Height": 21.25,
+    "Width": 14,
+    "Thickness": 3.15,
+    "Quantity": {
+        "X": 5,
+        "x1": 8,
+        "x2": 8,
+        "x3": 5,
+        "even": 11,
+        "odd": 11
+    },
+    "Z": "Width",
+}
+
 # EquipmentTokens (!=, ==)
 EquipmentToken = {"Height": 21.15, "Width": 29.75, "Thickness": 3.15, "Quantity": 2, "Z": "Height"}
 
@@ -62,6 +78,17 @@ Box = {
     "Depth": 40,
     "Z": "Depth",
 }
+
+# Secret Mission boxes come in large and smal
+SecretMissionBox = {
+        "Height": 129.0,
+        "Width": 86.0,
+        "Depth": 19.0,
+        "Z": "Depth"
+        }
+
+SecretMissionBoxL = SecretMissionBox.copy()
+SecretMissionBoxL["Width"] = SecretMissionBox["Width"] * 3 / 2
 
 # TokenTray holds the cut discs, infomarkers, and all info tokens
 TokenTray = {

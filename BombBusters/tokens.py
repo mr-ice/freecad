@@ -24,7 +24,8 @@ Public API
 ``build_token_tray_lid``, ``build_wire_tray``, ``build_wire_tray_access_holes``,
 ``build_wire_tray_pocket``, ``build_wire_tray_contents``,
 ``build_wire_tray_middle_pocket``, ``build_tray_contents``,
-``build_tray_access_hole``, ``build_tray_joint_cuts``, ``build_all``.
+``build_tray_access_hole``, ``build_tray_joint_cuts``, ``build_secret_mission_tray``,
+``secret_mission_edge_names``, ``build_all``.
 """
 
 import math
@@ -447,6 +448,9 @@ PLACEMENTS["TokenTray"] = (Vector(_TOKEN_TRAY_X_MAX - cfg.TokenTray["Height"], 0
 # TokenTrayLid is built directly in world coordinates (see build_token_tray_lid),
 # since its legs and joint keys need to line up with the tray's own world
 # position -- no PLACEMENTS entry needed.
+
+# SecretMissionTray sits off on its own, at the height the user asked for.
+PLACEMENTS["SecretMissionTray"] = (Vector(0, 0, 30), None)
 
 
 def place(shape, offset=None, rotation=None):
@@ -1097,6 +1101,355 @@ def _pack_row(shapes, gap):
     return placed, (cursor - gap if placed else 0.0)
 
 
+# SecretMissionTray: reusable base shell for a SecretMissionBox insert -- a
+# hollow tray with walls raised to the box's own depth, plus a two-notch grab
+# bit on one short edge. Column layout for the SecretMissionToken sets
+# themselves, and any leftover-space pocket, are deferred to a follow-up --
+# this is just the shell future SecretMission-bit trays can start from.
+_SECRET_GRAB_RADIUS = 16.0
+# Wall thickness everywhere except the grab point, which needs enough material
+# behind the notch cut (radius _SECRET_GRAB_RADIUS deep) to leave a plain
+# WALL_THICKNESS of wall beyond it.
+_SECRET_GRAB_WALL = _SECRET_GRAB_RADIUS + cfg.WALL_THICKNESS
+_SECRET_TRAY_OUTER_FILLET = 2.0
+# Inner cavity's own top rim / vertical corners -- same modest radius TokenTray
+# uses for its own pocket rims (_TRAY_TOP_FILLET).
+_SECRET_TRAY_INNER_FILLET = 1.5
+# The grab tab between the two notch cuts is only 2*WALL_THICKNESS thick --
+# the tray's usual outer radius on both its top and bottom rim at once would
+# eat the whole tab. Capped well under that.
+_SECRET_GRAB_TAB_FILLET = 0.5
+# The rest of the notch/boss curve (the vertical tangent lines where the
+# semicylinder meets the flat front face, the floor rim).
+_SECRET_GRAB_RIM_FILLET = 0.749
+
+
+def _secret_mission_grab_wall_bump(tray):
+    """Build the extra wall material behind the grab-bit notch.
+
+    A cylinder of radius ``_SECRET_GRAB_WALL`` (notch radius + WALL_THICKNESS),
+    centered on the tray's X=0 face same as the notch cut itself -- cut out of
+    the general inner cavity so this area stays solid, as a semicylindrical
+    boss concentric with the notch, instead of the plain ``WALL_THICKNESS``
+    used everywhere else.
+
+    Parameters
+    ----------
+    tray : dict
+        ``config.SecretMissionTray``.
+
+    Returns
+    -------
+    Part.Shape
+        The bump cylinder.
+    """
+    mid_y = tray["Width"] / 2
+    overshoot = 1.0
+    return Part.makeCylinder(
+        _SECRET_GRAB_WALL,
+        tray["Depth"] - cfg.WALL_THICKNESS + overshoot,
+        Vector(0, mid_y, cfg.WALL_THICKNESS),
+        Vector(0, 0, 1),
+    )
+
+
+def _secret_mission_grab_cut(tray):
+    """Build the two grab-bit notch cylinders for a SecretMissionTray short edge.
+
+    Both cylinders are centered exactly on the tray's X=0 face (vertical
+    axis) -- only the half inside the tray actually removes material, leaving
+    a clean semicircular notch (same trick as the tray's other edge-aligned
+    cuts, e.g. WireTray's access holes) -- and on the tray's Width at
+    ``Width / 2``. They're stacked along Z instead of spread along Y: one
+    below, one above, ``2 * WALL_THICKNESS`` of wall left between them,
+    centered on the tray's own height (``Depth / 2``), as the grab tab.
+
+    Parameters
+    ----------
+    tray : dict
+        ``config.SecretMissionTray``.
+
+    Returns
+    -------
+    Part.Shape
+        The fused pair of notch cylinders.
+    """
+    mid_y = tray["Width"] / 2
+    z_mid = tray["Depth"] / 2
+    gap = 2 * cfg.WALL_THICKNESS
+    overshoot = 1.0
+
+    bottom_top = z_mid - gap / 2
+    top_bottom = z_mid + gap / 2
+
+    bottom = Part.makeCylinder(
+        _SECRET_GRAB_RADIUS,
+        bottom_top + overshoot,
+        Vector(0, mid_y, -overshoot),
+        Vector(0, 0, 1),
+    )
+    top = Part.makeCylinder(
+        _SECRET_GRAB_RADIUS,
+        tray["Depth"] + overshoot - top_bottom,
+        Vector(0, mid_y, top_bottom),
+        Vector(0, 0, 1),
+    )
+    return bottom.fuse(top)
+
+
+def _secret_mission_inner_rim_edges(shape, tray, z_offset=0.0):
+    """Return the hollow cavity's own top-rim and vertical-corner edges.
+
+    Same ``_box_corner_edges`` trick :func:`_fillet_tray_outer_edges` uses for
+    the tray's outer box, aimed at the cavity's own bounding box instead --
+    its straight-edge-only filter naturally skips the grab notch's curved
+    boundary nearby, so this selection never picks up that region (see
+    :func:`_secret_mission_grab_edges`, which covers it separately).
+
+    Parameters
+    ----------
+    shape : Part.Shape
+        The tray, already hollowed and notch-cut.
+    tray : dict
+        ``config.SecretMissionTray``.
+    z_offset : float, optional
+        Added to every Z bound before matching -- 0 for the tray's own local
+        shape (as built), or the world Z it was placed at (see
+        ``PLACEMENTS["SecretMissionTray"]``) to select edges on the live
+        document object instead.
+
+    Returns
+    -------
+    list of Part.Edge
+        The cavity's rim/corner edges.
+
+    Examples
+    --------
+    Paste into the FreeCAD Python console, with the ``BombBusters`` document
+    open, to highlight this selection in the GUI:
+
+    >>> import tokens
+    >>> obj = App.ActiveDocument.getObject("SecretMissionTray")
+    >>> edges = tokens._secret_mission_inner_rim_edges(
+    ...     obj.Shape, tokens.cfg.SecretMissionTray, z_offset=30
+    ... )
+    >>> Gui.Selection.clearSelection()
+    >>> for name in tokens.secret_mission_edge_names(obj.Shape, edges):
+    ...     Gui.Selection.addSelection(obj, name)
+    """
+    x_min = cfg.WALL_THICKNESS
+    x_max = tray["Height"] - cfg.WALL_THICKNESS
+    y_min = cfg.WALL_THICKNESS
+    y_max = tray["Width"] - cfg.WALL_THICKNESS
+    z_min = cfg.WALL_THICKNESS + z_offset
+    z_max = tray["Depth"] + z_offset
+    return _box_corner_edges(shape, x_min, x_max, y_min, y_max, z_min, z_max)
+
+
+def _fillet_secret_mission_inner_rim(shape, tray):
+    """Fillet the hollow cavity's own top rim and 4 vertical corners.
+
+    Parameters
+    ----------
+    shape : Part.Shape
+        The tray, already hollowed and notch-cut.
+    tray : dict
+        ``config.SecretMissionTray``.
+
+    Returns
+    -------
+    Part.Shape
+        `shape` with the cavity's rim/corner edges filleted, best-effort.
+    """
+    inner_edges = _secret_mission_inner_rim_edges(shape, tray)
+    return _fillet_edges_best_effort(shape, _SECRET_TRAY_INNER_FILLET, inner_edges)
+
+
+def _secret_mission_grab_edges(shape, tray, z_offset=0.0):
+    """Return the grab notch/boss's own edges, split into (top, tab, rim, interior).
+
+    Restricted to edges whose center lies within the notch/boss's own X/Y
+    footprint (near the X=0 face, within ``_SECRET_GRAB_WALL`` of the notch's
+    Y center). Edges that don't reach all the way to the tray's true front
+    face (``X=0``) are the general pocket cavity's own boundary receding
+    around the boss instead of the notch's own visible surface -- concave
+    from the pocket's side, split out as ``interior`` and excluded from every
+    fillet pass. Everything left, all touching ``X=0``, is split by Z into:
+
+    - ``top``: the topmost rim, where the upper notch cut breaches the tray's
+      own top face -- exempted from every fillet pass (see
+      :func:`_fillet_secret_mission_grab`), right against the already-filleted
+      outer top edge, where rounding it produces an invalid solid;
+    - ``tab``: the tab's own top/bottom rims (where the two stacked notch cuts
+      meet the solid grab tab between them) -- gets a reduced radius, since
+      the tab is only ``2 * WALL_THICKNESS`` thick, too little material for
+      the tray's usual radius on both faces at once;
+    - ``rim``: everything else (the notch's own vertical tangent lines, its
+      floor rim) -- gets a modest radius.
+
+    Parameters
+    ----------
+    shape : Part.Shape
+        The tray, already hollowed and notch-cut.
+    tray : dict
+        ``config.SecretMissionTray``.
+    z_offset : float, optional
+        Added to every Z bound before matching -- see
+        :func:`_secret_mission_inner_rim_edges`.
+
+    Returns
+    -------
+    tuple of (list of Part.Edge, list of Part.Edge, list of Part.Edge, list of Part.Edge)
+        ``(top_edges, tab_edges, rim_edges, interior_edges)``.
+
+    Examples
+    --------
+    Paste into the FreeCAD Python console, with the ``BombBusters`` document
+    open, to highlight one category (``"top"``, ``"tab"``, ``"rim"``, or
+    ``"interior"``) in the GUI:
+
+    >>> import tokens
+    >>> obj = App.ActiveDocument.getObject("SecretMissionTray")
+    >>> top, tab, rim, interior = tokens._secret_mission_grab_edges(
+    ...     obj.Shape, tokens.cfg.SecretMissionTray, z_offset=30
+    ... )
+    >>> category = rim  # swap for top/tab/interior to inspect a different group
+    >>> Gui.Selection.clearSelection()
+    >>> for name in tokens.secret_mission_edge_names(obj.Shape, category):
+    ...     Gui.Selection.addSelection(obj, name)
+    """
+    mid_y = tray["Width"] / 2
+    z_mid = tray["Depth"] / 2 + z_offset
+    gap = 2 * cfg.WALL_THICKNESS
+    tab_z_values = (z_mid - gap / 2, z_mid + gap / 2)
+    top_z = tray["Depth"] + z_offset
+
+    def in_grab_region(edge):
+        com = edge.CenterOfMass
+        return (
+            com.x <= _SECRET_GRAB_WALL + 1e-3
+            and mid_y - _SECRET_GRAB_WALL - 1e-3 <= com.y <= mid_y + _SECRET_GRAB_WALL + 1e-3
+        )
+
+    top_edges, tab_edges, rim_edges, interior_edges = [], [], [], []
+    for edge in shape.Edges:
+        if not in_grab_region(edge):
+            continue
+        if edge.BoundBox.XMin > 1e-3:
+            interior_edges.append(edge)
+        elif _near(edge.BoundBox.ZMax, top_z, 1e-6):
+            top_edges.append(edge)
+        elif any(_near(edge.CenterOfMass.z, z, 0.1) for z in tab_z_values):
+            tab_edges.append(edge)
+        else:
+            rim_edges.append(edge)
+
+    return top_edges, tab_edges, rim_edges, interior_edges
+
+
+def secret_mission_edge_names(shape, edges):
+    """Return each edge's ``"EdgeN"`` subelement name within `shape`.
+
+    For selecting specific edges in the FreeCAD GUI --
+    ``Gui.Selection.addSelection`` takes a subelement name string, not an edge
+    object -- matched by ``isSame`` rather than identity, since a fresh
+    ``shape.Edges`` call returns new wrapper objects for the same underlying
+    edges.
+
+    Parameters
+    ----------
+    shape : Part.Shape
+        The shape `edges` came from.
+    edges : list of Part.Edge
+        Edges to name, e.g. from :func:`_secret_mission_grab_edges`.
+
+    Returns
+    -------
+    list of str
+        ``["EdgeN", ...]``, one per input edge found in `shape.Edges`.
+    """
+    all_edges = shape.Edges
+    names = []
+    for edge in edges:
+        for i, candidate in enumerate(all_edges):
+            if candidate.isSame(edge):
+                names.append(f"Edge{i + 1}")
+                break
+    return names
+
+
+def _fillet_secret_mission_grab(shape, tray):
+    """Fillet the grab notch/boss's own curved edges -- the outside of the grab bit.
+
+    Parameters
+    ----------
+    shape : Part.Shape
+        The tray, already hollowed, notch-cut, and inner-rim filleted.
+    tray : dict
+        ``config.SecretMissionTray``.
+
+    Returns
+    -------
+    Part.Shape
+        `shape` with the grab region's edges filleted, best-effort -- the
+        ``top`` and ``interior`` categories from :func:`_secret_mission_grab_edges`
+        are never filleted (see its docstring).
+    """
+    _top_edges, tab_edges, rim_edges, _interior_edges = _secret_mission_grab_edges(shape, tray)
+    shape = _fillet_edges_best_effort(shape, _SECRET_GRAB_TAB_FILLET, tab_edges)
+    return _fillet_edges_best_effort(shape, _SECRET_GRAB_RIM_FILLET, rim_edges)
+
+
+def build_secret_mission_tray():
+    """Build the SecretMissionTray shell: hollow box with a grab-bit notch.
+
+    Outer footprint is ``config.SecretMissionTray`` (sized to fit inside the
+    Small SecretMissionBox), walls and floor ``WALL_THICKNESS`` thick, open
+    top, raised to the box's own interior depth -- except the grab point,
+    where the wall is thickened to radius + WALL_THICKNESS (see
+    :func:`_secret_mission_grab_wall_bump`) so the notch cut still leaves a
+    plain WALL_THICKNESS of material behind it. One short edge (X=0) has two
+    semicircular notches cut into it, stacked along Z with
+    ``2 * WALL_THICKNESS`` of wall between them as a grab tab (see
+    :func:`_secret_mission_grab_cut`).
+
+    Fillet order matches TokenTray/WireTray (see :func:`_fillet_tray_outer_edges`):
+    the 12 outer box edges are rounded on the plain, uncut box first, before
+    any pocket or notch nearby could thin out the material a fillet needs --
+    then the hollow and notch are cut, then the cavity's own rim
+    (:func:`_fillet_secret_mission_inner_rim`) and the grab region's own edges
+    (:func:`_fillet_secret_mission_grab`) are filleted separately, each
+    best-effort.
+
+    Returns
+    -------
+    list of (str, Part.Shape)
+        ``[("SecretMissionTray", shape)]``
+    """
+    tray = cfg.SecretMissionTray
+    outer = Part.makeBox(tray["Height"], tray["Width"], tray["Depth"])
+    outer_edges = _box_corner_edges(outer, 0, tray["Height"], 0, tray["Width"], 0, tray["Depth"])
+    outer = _fillet_edges_best_effort(outer, _SECRET_TRAY_OUTER_FILLET, outer_edges)
+
+    overshoot = 1.0
+    inner = Part.makeBox(
+        tray["Height"] - 2 * cfg.WALL_THICKNESS,
+        tray["Width"] - 2 * cfg.WALL_THICKNESS,
+        tray["Depth"] - cfg.WALL_THICKNESS + overshoot,
+        Vector(cfg.WALL_THICKNESS, cfg.WALL_THICKNESS, cfg.WALL_THICKNESS),
+    )
+    inner = inner.cut(_secret_mission_grab_wall_bump(tray))
+    shape = outer.cut(inner)
+    shape = shape.cut(_secret_mission_grab_cut(tray))
+
+    if True:
+        shape = _fillet_secret_mission_inner_rim(shape, tray)
+    if False:
+        shape = _fillet_secret_mission_grab(shape, tray)
+
+    return [("SecretMissionTray", shape)]
+
+
 def build_all():
     """Lay out one of every component group, left to right, for scale reference.
 
@@ -1129,6 +1482,7 @@ def build_all():
         build_tray_contents(),
         build_tray_access_hole(),
         build_tray_joint_cuts(),
+        build_secret_mission_tray(),
     ]
 
     result = []
