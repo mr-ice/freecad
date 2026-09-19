@@ -38,7 +38,7 @@ EquipmentToken = {"Height": 21.15, "Width": 29.75, "Thickness": 3.15, "Quantity"
 
 # Markers
 InfoMarker = {
-    "Red": {"Diameter": 8, "Height": 12, "Quantity": 3},
+    "Red": {"Diameter": 8, "Height": 12, "Quantity": 4},
     "Yellow": {"Width": 8, "Height": 12, "Quantity": 4},
     "Z": "Height",
 }

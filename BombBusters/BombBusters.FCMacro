@@ -44,8 +44,27 @@ doc = App.newDocument(DOC_NAME)
 # box-level InfoToken/InfoMarker/EquipmentToken/BlueCutDisc originals now that
 # their Tray_-prefixed counterparts are actually housed in TokenTray, and
 # Card_Equipment now that Card_Equipment_Double supersedes it.
-_HIDDEN_PREFIXES = ("Tray_", "WireTray_", "WireToken_Blue_", "InfoToken_", "InfoMarker_")
-_HIDDEN_NAMES = {"EquipmentToken_Pair", "BlueCutDisc_Stack", "Card_Equipment"}
+_HIDDEN_PREFIXES = (
+    "Tray_",
+    "WireTray_",
+    "WireToken_Blue_",
+    "InfoToken_",
+    "InfoMarker_",
+    "SecretMissionAccessCut_",
+    "SecretMissionToken_",
+)
+_HIDDEN_NAMES = {
+    "EquipmentToken_Pair",
+    "BlueCutDisc_Stack",
+    "Card_Equipment",
+    "WireToken_Red",
+    "WireToken_Yellow",
+    "Card_Mission",
+    "Card_Equipment_Double",
+    "TokenTrayLid",
+    "SecretMissionTray",
+    "WireTray",
+}
 
 for name, shape in tokens.build_all():
     obj = doc.addObject("Part::Feature", name)
@@ -57,6 +76,7 @@ box_obj = doc.addObject("Part::Feature", "Box_Reference")
 box_obj.Shape = tokens.build_box()
 if box_obj.ViewObject is not None:
     box_obj.ViewObject.Transparency = 80
+    box_obj.ViewObject.Visibility = False
 
 doc.recompute()
 

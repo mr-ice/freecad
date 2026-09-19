@@ -25,7 +25,9 @@ Public API
 ``build_wire_tray_pocket``, ``build_wire_tray_contents``,
 ``build_wire_tray_middle_pocket``, ``build_tray_contents``,
 ``build_tray_access_hole``, ``build_tray_joint_cuts``, ``build_secret_mission_tray``,
-``secret_mission_edge_names``, ``build_all``.
+``secret_mission_edge_names``, ``build_secret_mission_tokens``,
+``build_secret_mission_token_tray``, ``build_secret_mission_access_cuts``,
+``build_all``.
 """
 
 import math
@@ -153,7 +155,7 @@ _GRID_ROW_MARGIN = 7.0
 
 # Row 0's own depth is the largest of its (now rotated) items' cross sections.
 _marker_red = cfg.InfoMarker["Red"]
-_RED_DIAMETER_EFF = _marker_red["Diameter"] + cfg.TOLERANCE
+_RED_DIAMETER_EFF = _marker_red["Diameter"] - cfg.WALL_THICKNESS
 _RED_RADIUS_EFF = _RED_DIAMETER_EFF / 2
 _RED_PITCH = _marker_red["Diameter"] + PAIR_GAP
 _RED_SPREAD = (_marker_red["Quantity"] - 1) * _RED_PITCH + _RED_DIAMETER_EFF
@@ -304,9 +306,9 @@ _MARKER_TOP_FILLET = 1.0
 # (_fillet_tray_outer_edges) and WireTray_AccessHole_Horizontal's own top rim
 # stay on. The rest proved too fragile a mix of results; flip a category back
 # on individually to revisit it.
-_ENABLE_DISC_TOP_FILLET = False
-_ENABLE_MARKER_TOP_FILLET = False
-_ENABLE_TOKEN_TOP_FILLET = False
+_ENABLE_DISC_TOP_FILLET = True
+_ENABLE_MARKER_TOP_FILLET = True
+_ENABLE_TOKEN_TOP_FILLET = True
 _ENABLE_WIRE_HOLE_VERTICAL_TOP_FILLET = False
 _ENABLE_WIRE_HOLE_HORIZONTAL_TOP_FILLET = True
 _ENABLE_WIRE_POCKET_TOP_FILLET = False
@@ -348,6 +350,164 @@ _TOP_FILLET_CATEGORIES = (
     ("wire_pocket", _ENABLE_WIRE_POCKET_TOP_FILLET, _TRAY_TOP_FILLET),
     ("wire_item", _ENABLE_WIRE_ITEM_TOP_FILLET, _WIRE_ITEM_TOP_FILLET),
 )
+
+
+# Each target's own cutting-tool prefix (so TokenTray/TokenTrayLid's Tray_
+# tools never get cut into WireTray, or vice versa) and which of its own
+# prefixed tools to skip. TokenTrayLid skips the access hole -- it's meant to
+# poke out through the tray's own top, not the lid sitting above it.
+_CUT_TARGETS = {
+    "TokenTray": ("Tray_", frozenset()),
+    "TokenTrayLid": ("Tray_", frozenset({"Tray_AccessHole", "Tray_JointLeft", "Tray_JointRight"})),
+    "WireTray": ("WireTray_", frozenset()),
+}
+
+
+# SecretMissionTray: reusable base shell for a SecretMissionBox insert -- a
+# hollow tray with walls raised to the box's own depth, plus a two-notch grab
+# bit on one short edge.
+#
+# The grab radius is derived from the Mission card's own length, so one is
+# guaranteed to fit past it (see build_secret_mission_tray's docstring).
+_SECRET_GRAB_RADIUS = (
+    cfg.SecretMissionTray["Height"]
+    - 2 * cfg.WALL_THICKNESS  # the grab wall's reinforcement, plus the far wall
+    - (cfg.Card["Mission"]["Height"] + cfg.TOLERANCE * 2)  # the card itself, plus clearance
+)
+# Wall thickness everywhere except the grab point, which needs enough material
+# behind the notch cut (radius _SECRET_GRAB_RADIUS deep) to leave a plain
+# WALL_THICKNESS of wall beyond it.
+_SECRET_GRAB_WALL = _SECRET_GRAB_RADIUS + cfg.WALL_THICKNESS
+_SECRET_TRAY_OUTER_FILLET = 2.0
+# Inner cavity's own top rim / vertical corners -- same modest radius TokenTray
+# uses for its own pocket rims (_TRAY_TOP_FILLET).
+_SECRET_TRAY_INNER_FILLET = 1.5
+# The grab tab between the two notch cuts is only 2*WALL_THICKNESS thick --
+# the tray's usual outer radius on both its top and bottom rim at once would
+# eat the whole tab. Capped well under that.
+_SECRET_GRAB_TAB_FILLET = 0.5
+# The rest of the notch/boss curve (the vertical tangent lines where the
+# semicylinder meets the flat front face, the floor rim).
+_SECRET_GRAB_RIM_FILLET = 0.749
+
+
+# SecretMissionTokenTray: a second copy of the same shell, arranged as a
+# 2-row x 3-column grid of pockets for the SecretMissionTokens stacks. Row 0
+# (nearest the grab bit) is X/x3/x2; row 1 (toward +X) is even/odd/x1.
+_SECRET_TOKEN_GRID = (("X", "x3", "x2"), ("even", "odd", "x1"))
+_SECRET_TOKEN_Y = cfg.SecretMissionTokens["Height"] + cfg.TOLERANCE
+_SECRET_COL_GAP = 2.0
+_SECRET_COL_PITCH = _SECRET_TOKEN_Y + _SECRET_COL_GAP
+_SECRET_COL_COUNT = len(_SECRET_TOKEN_GRID[0])
+_SECRET_COL_MARGIN = (
+    cfg.SecretMissionTray["Width"]
+    - 2 * cfg.WALL_THICKNESS
+    - _SECRET_COL_COUNT * _SECRET_TOKEN_Y
+    - (_SECRET_COL_COUNT - 1) * _SECRET_COL_GAP
+) / 2
+
+
+def _secret_mission_stack_length(key):
+    """Return one SecretMissionTokens stack's own X length (its stacking dimension).
+
+    Same formula :func:`make_box_stack` uses for the stacking dimension --
+    computed directly (rather than by building the stack) so the token tray's
+    own pocket layout can be sized at module load, before ``make_box_stack``
+    itself is defined further down the file.
+
+    Parameters
+    ----------
+    key : str
+        A ``config.SecretMissionTokens["Quantity"]`` key.
+
+    Returns
+    -------
+    float
+        ``Thickness * Quantity[key] + TOLERANCE``, in mm.
+    """
+    smt = cfg.SecretMissionTokens
+    return smt["Thickness"] * smt["Quantity"][key] + cfg.TOLERANCE
+
+
+def _secret_mission_row_length(row_keys):
+    """Return a grid row's own X length -- its deepest stack, in mm."""
+    return max(_secret_mission_stack_length(key) for key in row_keys)
+
+
+# Two pockets split the general cavity along X:
+#
+# - Pocket 1 (holds the token grid): shallow, its floor raised to
+#   _SECRET_POCKET1_FLOOR_Z (roughly half the tray's own depth) -- spanning
+#   from its own min X (sized to exactly fit the token grid, worked out
+#   backward from the tray's far edge) to _SECRET_POCKET_MAX_X, capped
+#   3*WALL_THICKNESS shy of the tray's own far wall.
+# - Pocket 2 (everything nearer the grab bit): full depth, with the grab
+#   boss's own reinforcement (_secret_mission_grab_wall_bump) cut out of it,
+#   same as the plain SecretMissionTray's own general cavity.
+#
+# A WALL_THICKNESS-thick wall, left uncut, separates the two.
+_SECRET_POCKET_MAX_X = cfg.SecretMissionTray["Height"] - 3 * cfg.WALL_THICKNESS
+# Every column pairs one row-0 key with one row-1 key (column 0 is X then
+# even, etc.) -- each column holds the same total token count (16 each:
+# 5+11, 5+11, 8+8), so every column's combined length (both its own stacks
+# plus one _GRID_ROW_GAP between them) comes out equal too. A single shared
+# start (this constant) therefore lands every column's own end at the same X
+# as well, 4*WALL_THICKNESS shy of the tray's own far wall (one
+# WALL_THICKNESS shy of _SECRET_POCKET_MAX_X itself) -- max() over columns
+# rather than assuming the equality holds, in case config ever changes it.
+_SECRET_LAST_ROW_MAX_X = cfg.SecretMissionTray["Height"] - 4 * cfg.WALL_THICKNESS
+_SECRET_COL_TOTAL_LENGTH = max(
+    sum(_secret_mission_stack_length(row[col]) for row in _SECRET_TOKEN_GRID)
+    + _GRID_ROW_GAP * (len(_SECRET_TOKEN_GRID) - 1)
+    for col in range(_SECRET_COL_COUNT)
+)
+_SECRET_STACK_X_START = _SECRET_LAST_ROW_MAX_X - _SECRET_COL_TOTAL_LENGTH
+_SECRET_POCKET1_MIN_X = _SECRET_STACK_X_START
+_SECRET_POCKET2_MAX_X = _SECRET_POCKET1_MIN_X - cfg.WALL_THICKNESS
+_SECRET_POCKET1_FLOOR_Z = cfg.WALL_THICKNESS + cfg.SecretMissionTokens["Width"] / 2
+# One horizontal access cut per column, through the tray's own far wall and
+# the wall between the two pockets, resting on pocket 1's own floor.
+_SECRET_ACCESS_RADIUS = 10.0
+
+# SecretMissionTokenTray sits beside the plain SecretMissionTray, same Z.
+_SECRET_TRAY2_OFFSET = Vector(cfg.SecretMissionTray["Height"] + 10.0, 0, 30)
+PLACEMENTS["SecretMissionTokenTray"] = (_SECRET_TRAY2_OFFSET, None)
+
+# Every piece that gets the tray's outer fillet plus (where cut) its pockets'
+# top-face fillet.
+_FILLET_TARGETS = ("TokenTray", "TokenTrayLid", "WireTray")
+
+
+
+# Each SecretMissionToken stack's own reference copy is placed in world
+# coordinates alongside SecretMissionTokenTray, offset the same as the tray
+# itself (_SECRET_TRAY2_OFFSET) -- done here, after _secret_mission_token_placements
+# is defined, rather than up with the other SecretMission* constants.
+for _smt_name, _smt_local_offset in _secret_mission_token_placements().items():
+    PLACEMENTS[_smt_name] = (_smt_local_offset + _SECRET_TRAY2_OFFSET, None)
+
+
+_populate_info_grid_placements("", _GRID_BLOCK_MIN_X)
+# The Tray_ copy is a set of cutting tools for build_all()'s TokenTray pocket cut
+# (see _cut_tray_contents), so it's placed at the exact same coordinates as the
+# box's own grid -- which line up with the tray once its +X edge is aligned to
+# the box's, below.
+_populate_info_grid_placements("Tray_", _GRID_BLOCK_MIN_X)
+
+# TokenTray's +X edge is aligned with _TOKEN_TRAY_X_MAX (pulled back from the
+# box's own +X edge, see _TOKEN_TRAY_X_SHIFT -- otherwise TokenTrayLid's right
+# leg pokes straight through the box), so it sits directly under the box's own
+# info-token/equipment/marker/disc grid (see _GRID_BLOCK_MIN_X, which now
+# shares that same pulled-back edge); its own bottom is at Z=0 (not raised
+# onto WALL_THICKNESS like the box parts).
+PLACEMENTS["TokenTray"] = (Vector(_TOKEN_TRAY_X_MAX - cfg.TokenTray["Height"], 0, 0), None)
+
+# TokenTrayLid is built directly in world coordinates (see build_token_tray_lid),
+# since its legs and joint keys need to line up with the tray's own world
+# position -- no PLACEMENTS entry needed.
+
+# SecretMissionTray sits off on its own, at the height the user asked for.
+PLACEMENTS["SecretMissionTray"] = (Vector(0, 0, 30), None)
 
 
 def _populate_info_grid_placements(prefix, block_min_x):
@@ -428,29 +588,6 @@ def _populate_info_grid_placements(prefix, block_min_x):
         Vector(row0_top - _DISC_RADIUS_EFF, disc_y, _ROW0_TOP_Z - _DISC_RADIUS_EFF),
         (Vector(0, 0, 1), 90),
     )
-
-
-_populate_info_grid_placements("", _GRID_BLOCK_MIN_X)
-# The Tray_ copy is a set of cutting tools for build_all()'s TokenTray pocket cut
-# (see _cut_tray_contents), so it's placed at the exact same coordinates as the
-# box's own grid -- which line up with the tray once its +X edge is aligned to
-# the box's, below.
-_populate_info_grid_placements("Tray_", _GRID_BLOCK_MIN_X)
-
-# TokenTray's +X edge is aligned with _TOKEN_TRAY_X_MAX (pulled back from the
-# box's own +X edge, see _TOKEN_TRAY_X_SHIFT -- otherwise TokenTrayLid's right
-# leg pokes straight through the box), so it sits directly under the box's own
-# info-token/equipment/marker/disc grid (see _GRID_BLOCK_MIN_X, which now
-# shares that same pulled-back edge); its own bottom is at Z=0 (not raised
-# onto WALL_THICKNESS like the box parts).
-PLACEMENTS["TokenTray"] = (Vector(_TOKEN_TRAY_X_MAX - cfg.TokenTray["Height"], 0, 0), None)
-
-# TokenTrayLid is built directly in world coordinates (see build_token_tray_lid),
-# since its legs and joint keys need to line up with the tray's own world
-# position -- no PLACEMENTS entry needed.
-
-# SecretMissionTray sits off on its own, at the height the user asked for.
-PLACEMENTS["SecretMissionTray"] = (Vector(0, 0, 30), None)
 
 
 def place(shape, offset=None, rotation=None):
@@ -1101,39 +1238,6 @@ def _pack_row(shapes, gap):
     return placed, (cursor - gap if placed else 0.0)
 
 
-# SecretMissionTray: reusable base shell for a SecretMissionBox insert -- a
-# hollow tray with walls raised to the box's own depth, plus a two-notch grab
-# bit on one short edge. Column layout for the SecretMissionToken sets
-# themselves, and any leftover-space pocket, are deferred to a follow-up --
-# this is just the shell future SecretMission-bit trays can start from.
-#
-# The grab bit's own radius is truncated -- shortened from whatever a roomy
-# grab notch would otherwise want -- down to whatever the general pocket has
-# left once the longest thing this tray will ever hold (a Mission card, laid
-# lengthwise) still fits between the grab wall's own reinforcement
-# (_SECRET_GRAB_WALL, see below) and the tray's far wall.
-_SECRET_GRAB_RADIUS = (
-    cfg.SecretMissionTray["Height"]
-    - 2 * cfg.WALL_THICKNESS  # the grab wall's reinforcement, plus the far wall
-    - (cfg.Card["Mission"]["Height"] + cfg.TOLERANCE * 2)  # the card itself, plus clearance
-)
-# Wall thickness everywhere except the grab point, which needs enough material
-# behind the notch cut (radius _SECRET_GRAB_RADIUS deep) to leave a plain
-# WALL_THICKNESS of wall beyond it.
-_SECRET_GRAB_WALL = _SECRET_GRAB_RADIUS + cfg.WALL_THICKNESS
-_SECRET_TRAY_OUTER_FILLET = 2.0
-# Inner cavity's own top rim / vertical corners -- same modest radius TokenTray
-# uses for its own pocket rims (_TRAY_TOP_FILLET).
-_SECRET_TRAY_INNER_FILLET = 1.5
-# The grab tab between the two notch cuts is only 2*WALL_THICKNESS thick --
-# the tray's usual outer radius on both its top and bottom rim at once would
-# eat the whole tab. Capped well under that.
-_SECRET_GRAB_TAB_FILLET = 0.5
-# The rest of the notch/boss curve (the vertical tangent lines where the
-# semicylinder meets the flat front face, the floor rim).
-_SECRET_GRAB_RIM_FILLET = 0.749
-
-
 def _secret_mission_grab_wall_bump(tray):
     """Build the extra wall material behind the grab-bit notch.
 
@@ -1410,7 +1514,32 @@ def _fillet_secret_mission_grab(shape, tray):
     return _fillet_edges_best_effort(shape, _SECRET_GRAB_RIM_FILLET, rim_edges)
 
 
-def build_secret_mission_tray():
+def _secret_mission_shell_blank(name):
+    """Build the SecretMissionTray's outer shell, filleted, with the grab notch cut.
+
+    No general inner cavity -- callers cut their own (see
+    :func:`build_secret_mission_tray` for the plain single-cavity version, or
+    :func:`build_secret_mission_token_tray` for the two-pocket version).
+
+    Parameters
+    ----------
+    name : str
+        Unused directly, kept for symmetry with the ``(name, shape)`` pairs
+        every other ``build_*`` function returns.
+
+    Returns
+    -------
+    Part.Shape
+        The filleted, notch-cut outer shell.
+    """
+    tray = cfg.SecretMissionTray
+    outer = Part.makeBox(tray["Height"], tray["Width"], tray["Depth"])
+    outer_edges = _box_corner_edges(outer, 0, tray["Height"], 0, tray["Width"], 0, tray["Depth"])
+    outer = _fillet_edges_best_effort(outer, _SECRET_TRAY_OUTER_FILLET, outer_edges)
+    return outer.cut(_secret_mission_grab_cut(tray))
+
+
+def build_secret_mission_tray(name="SecretMissionTray"):
     """Build the SecretMissionTray shell: hollow box with a grab-bit notch.
 
     Outer footprint is ``config.SecretMissionTray`` (sized to fit inside the
@@ -1424,22 +1553,25 @@ def build_secret_mission_tray():
     :func:`_secret_mission_grab_cut`).
 
     Fillet order matches TokenTray/WireTray (see :func:`_fillet_tray_outer_edges`):
-    the 12 outer box edges are rounded on the plain, uncut box first, before
-    any pocket or notch nearby could thin out the material a fillet needs --
-    then the hollow and notch are cut, then the cavity's own rim
-    (:func:`_fillet_secret_mission_inner_rim`) and the grab region's own edges
-    (:func:`_fillet_secret_mission_grab`) are filleted separately, each
-    best-effort.
+    the 12 outer box edges are rounded on the plain, uncut box first (see
+    :func:`_secret_mission_shell_blank`), before any pocket or notch nearby
+    could thin out the material a fillet needs -- then the general cavity is
+    cut, then its own rim (:func:`_fillet_secret_mission_inner_rim`) is
+    filleted. The grab region's own fillet (:func:`_fillet_secret_mission_grab`)
+    is left off for now -- not every one of its edges fillets cleanly yet.
+
+    Parameters
+    ----------
+    name : str, optional
+        Name for the returned part.
 
     Returns
     -------
     list of (str, Part.Shape)
-        ``[("SecretMissionTray", shape)]``
+        ``[(name, shape)]``
     """
     tray = cfg.SecretMissionTray
-    outer = Part.makeBox(tray["Height"], tray["Width"], tray["Depth"])
-    outer_edges = _box_corner_edges(outer, 0, tray["Height"], 0, tray["Width"], 0, tray["Depth"])
-    outer = _fillet_edges_best_effort(outer, _SECRET_TRAY_OUTER_FILLET, outer_edges)
+    shape = _secret_mission_shell_blank(name)
 
     overshoot = 1.0
     inner = Part.makeBox(
@@ -1449,15 +1581,241 @@ def build_secret_mission_tray():
         Vector(cfg.WALL_THICKNESS, cfg.WALL_THICKNESS, cfg.WALL_THICKNESS),
     )
     inner = inner.cut(_secret_mission_grab_wall_bump(tray))
-    shape = outer.cut(inner)
-    shape = shape.cut(_secret_mission_grab_cut(tray))
+    shape = shape.cut(inner)
+    shape = _fillet_secret_mission_inner_rim(shape, tray)
 
-    if True:
-        shape = _fillet_secret_mission_inner_rim(shape, tray)
-    if False:
-        shape = _fillet_secret_mission_grab(shape, tray)
+    return [(name, shape)]
 
-    return [("SecretMissionTray", shape)]
+
+def _secret_mission_col_y(col):
+    """Return the min-Y edge of SecretMissionTokenTray column `col` (0-2)."""
+    return cfg.WALL_THICKNESS + _SECRET_COL_MARGIN + col * _SECRET_COL_PITCH
+
+
+def build_secret_mission_tokens():
+    """Build one fused stack per SecretMissionTokens quantity key.
+
+    Each stack is fused along its own Thickness (see :func:`make_box_stack`,
+    ``z_dim="Width"`` per ``config.SecretMissionTokens["Z"]``) -- Width ends up
+    vertical (Z) instead of Height, or the stack is too tall to fit under the
+    SecretMissionBox's own shallow depth.
+
+    Returns
+    -------
+    list of (str, Part.Shape)
+        ``[("SecretMissionToken_X", shape), ("SecretMissionToken_x1", shape),
+        ...]``, one per ``config.SecretMissionTokens["Quantity"]`` key.
+    """
+    smt = cfg.SecretMissionTokens
+    height, width, thickness, z = smt["Height"], smt["Width"], smt["Thickness"], smt["Z"]
+    return [
+        (f"SecretMissionToken_{key}", make_box_stack(height, width, thickness, qty, z))
+        for key, qty in smt["Quantity"].items()
+    ]
+
+
+def _secret_mission_token_placements():
+    """Compute each SecretMissionToken stack's local placement, before world offset.
+
+    Three columns across the tray's Width (Y). Placed column by column, not
+    row by row: within a column, its two stacks (:data:`_SECRET_TOKEN_GRID`'s
+    row 0 and row 1 keys at that column index) sit end to end along X (the
+    tray's Height axis), the first starting at :data:`_SECRET_STACK_X_START`
+    (pocket 1's own near edge), the second ``_GRID_ROW_GAP`` past it. Every
+    column shares that same start -- see :data:`_SECRET_STACK_X_START`, which
+    is sized so every column's own combined length also lands its second
+    stack's far edge at the same X.
+
+    Returns
+    -------
+    dict of str -> FreeCAD.Vector
+        ``{"SecretMissionToken_X": Vector(...), ...}``, local to the tray (its
+        own min corner at the origin) -- add the tray's own world offset (see
+        ``PLACEMENTS["SecretMissionTokenTray"]``) before placing in the scene.
+    """
+    stacks = dict(build_secret_mission_tokens())
+    placements = {}
+    for col in range(_SECRET_COL_COUNT):
+        y = _secret_mission_col_y(col)
+        x = _SECRET_STACK_X_START
+        for row_keys in _SECRET_TOKEN_GRID:
+            name = f"SecretMissionToken_{row_keys[col]}"
+            placements[name] = Vector(x, y, cfg.WALL_THICKNESS)
+            x += stacks[name].BoundBox.XLength + _GRID_ROW_GAP
+    return placements
+
+
+def _secret_mission_pocket1(col):
+    """Build one column's pocket 1 cutting tool -- the shallow, token-holding pocket.
+
+    Spans :data:`_SECRET_POCKET1_MIN_X` to :data:`_SECRET_POCKET_MAX_X`, the
+    column's own Y band (:func:`_secret_mission_col_y`), floor raised to
+    :data:`_SECRET_POCKET1_FLOOR_Z`. Open through the top (with overshoot).
+
+    Parameters
+    ----------
+    col : int
+        Column index (0-2), see :func:`_secret_mission_col_y`.
+
+    Returns
+    -------
+    Part.Shape
+        The pocket 1 cutting tool.
+    """
+    tray = cfg.SecretMissionTray
+    overshoot = 1.0
+    top_z = tray["Depth"] + overshoot
+    return Part.makeBox(
+        _SECRET_POCKET_MAX_X - _SECRET_POCKET1_MIN_X,
+        _SECRET_TOKEN_Y,
+        top_z - _SECRET_POCKET1_FLOOR_Z,
+        Vector(_SECRET_POCKET1_MIN_X, _secret_mission_col_y(col), _SECRET_POCKET1_FLOOR_Z),
+    )
+
+
+def _secret_mission_pocket2():
+    """Build pocket 2's cutting tool -- the full-depth cavity near the grab bit.
+
+    Spans the tray's usual wall boundary (``WALL_THICKNESS``) to
+    :data:`_SECRET_POCKET2_MAX_X`, the tray's usual floor to floor
+    (``WALL_THICKNESS``), full Width, open through the top (with overshoot),
+    with the grab boss's own reinforcement (:func:`_secret_mission_grab_wall_bump`)
+    cut out of it -- same treatment the plain SecretMissionTray's own general
+    cavity gets (see :func:`build_secret_mission_tray`). Nothing is stored
+    here; it's just the tray's own open interior around the grab bit.
+
+    Returns
+    -------
+    Part.Shape
+        The pocket 2 cutting tool.
+    """
+    tray = cfg.SecretMissionTray
+    overshoot = 1.0
+    top_z = tray["Depth"] + overshoot
+    pocket = Part.makeBox(
+        _SECRET_POCKET2_MAX_X - cfg.WALL_THICKNESS,
+        tray["Width"] - 2 * cfg.WALL_THICKNESS,
+        top_z - cfg.WALL_THICKNESS,
+        Vector(cfg.WALL_THICKNESS, cfg.WALL_THICKNESS, cfg.WALL_THICKNESS),
+    )
+    return pocket.cut(_secret_mission_grab_wall_bump(tray))
+
+
+def _secret_mission_token_slots():
+    """Build one deeper slot cutting tool per SecretMissionToken stack.
+
+    Cut into pocket 1's own shallow floor, down to the tray's usual floor
+    (``WALL_THICKNESS``), sized and positioned to each stack's own footprint
+    (see :func:`_secret_mission_token_placements`) -- the raised floor around
+    them (pocket 1 itself) is just background; the stacks sit in these
+    deeper, snug slots.
+
+    Returns
+    -------
+    list of Part.Shape
+        One slot per stack.
+    """
+    tray = cfg.SecretMissionTray
+    stacks = dict(build_secret_mission_tokens())
+    overshoot = 1.0
+    top_z = tray["Depth"] + overshoot
+    slots = []
+    for name, offset in _secret_mission_token_placements().items():
+        box = stacks[name].BoundBox
+        slots.append(
+            Part.makeBox(
+                box.XLength, box.YLength, top_z - offset.z, Vector(offset.x, offset.y, offset.z)
+            )
+        )
+    return slots
+
+
+def _secret_mission_access_cut(col):
+    """Build one column's horizontal access cylinder.
+
+    Centered on the column (Y) and on :data:`_SECRET_POCKET1_FLOOR_Z` (its
+    bottom edge resting exactly at that height), running along X through
+    pocket 1's own two boundary walls: the tray's own far wall (beyond
+    :data:`_SECRET_POCKET_MAX_X`) and the wall between pocket 1 and pocket 2
+    (:data:`_SECRET_POCKET2_MAX_X` to :data:`_SECRET_POCKET1_MIN_X`).
+
+    Parameters
+    ----------
+    col : int
+        Column index (0-2), see :func:`_secret_mission_col_y`.
+
+    Returns
+    -------
+    Part.Shape
+        The cutting cylinder.
+    """
+    tray = cfg.SecretMissionTray
+    overshoot = 1.0
+    y_mid = _secret_mission_col_y(col) + _SECRET_TOKEN_Y / 2
+    z = _SECRET_POCKET1_FLOOR_Z + _SECRET_ACCESS_RADIUS
+    x_start = _SECRET_POCKET2_MAX_X - overshoot
+    length = tray["Height"] + overshoot - x_start
+    return Part.makeCylinder(
+        _SECRET_ACCESS_RADIUS, length, Vector(x_start, y_mid, z), Vector(1, 0, 0)
+    )
+
+
+def build_secret_mission_token_tray(name="SecretMissionTokenTray"):
+    """Build a second SecretMissionTray shell with the two-pocket token layout cut in.
+
+    Same shell/grab bit as :func:`build_secret_mission_tray`, but with its
+    general cavity split in two along X (see :func:`_secret_mission_pocket1`,
+    :func:`_secret_mission_pocket2`): pocket 1 (shallow, near the tray's far
+    wall) holds the token grid; pocket 2 (full depth, near the grab bit, the
+    boss's own reinforcement cut out of it) holds nothing. A
+    ``WALL_THICKNESS``-thick wall, left uncut, separates the two. Within
+    pocket 1, one deeper slot per token stack
+    (:func:`_secret_mission_token_slots`) is cut down to the tray's usual
+    floor. A horizontal access cylinder per column
+    (:func:`_secret_mission_access_cut`) pierces pocket 1's own two boundary
+    walls -- the tray's far wall and the wall between the two pockets.
+
+    Returns
+    -------
+    list of (str, Part.Shape)
+        ``[(name, shape)]``
+    """
+    shape = _secret_mission_shell_blank(name)
+
+    shape = shape.cut(_secret_mission_pocket2())
+    for col in range(_SECRET_COL_COUNT):
+        shape = shape.cut(_secret_mission_pocket1(col))
+    for slot in _secret_mission_token_slots():
+        shape = shape.cut(slot)
+    for col in range(_SECRET_COL_COUNT):
+        shape = shape.cut(_secret_mission_access_cut(col))
+
+    return [(name, shape)]
+
+
+def build_secret_mission_access_cuts():
+    """Build the three column access cylinders as their own named parts.
+
+    The same shapes :func:`build_secret_mission_token_tray` cuts into the
+    tray, exposed separately so they show up in the tree view for inspection
+    -- BombBusters.FCMacro hides them by default (``SecretMissionAccessCut_``
+    is in its ``_HIDDEN_PREFIXES``), same as the other trays' own cutting
+    tools.
+
+    Returns
+    -------
+    list of (str, Part.Shape)
+        ``[("SecretMissionAccessCut_0", shape), ...]``, one per column,
+        already placed in world coordinates (offset by
+        ``PLACEMENTS["SecretMissionTokenTray"]``).
+    """
+    return [
+        (
+            f"SecretMissionAccessCut_{col}",
+            place(_secret_mission_access_cut(col), _SECRET_TRAY2_OFFSET),
+        )
+        for col in range(_SECRET_COL_COUNT)
+    ]
 
 
 def build_all():
@@ -1493,6 +1851,9 @@ def build_all():
         build_tray_access_hole(),
         build_tray_joint_cuts(),
         build_secret_mission_tray(),
+        build_secret_mission_tokens(),
+        build_secret_mission_token_tray(),
+        build_secret_mission_access_cuts(),
     ]
 
     result = []
@@ -1504,17 +1865,6 @@ def build_all():
             result.append((name, shape))
 
     return _fillet_tray_top_rims(_cut_tray_contents(_fillet_tray_outer_edges(result)))
-
-
-# Each target's own cutting-tool prefix (so TokenTray/TokenTrayLid's Tray_
-# tools never get cut into WireTray, or vice versa) and which of its own
-# prefixed tools to skip. TokenTrayLid skips the access hole -- it's meant to
-# poke out through the tray's own top, not the lid sitting above it.
-_CUT_TARGETS = {
-    "TokenTray": ("Tray_", frozenset()),
-    "TokenTrayLid": ("Tray_", frozenset({"Tray_AccessHole", "Tray_JointLeft", "Tray_JointRight"})),
-    "WireTray": ("WireTray_", frozenset()),
-}
 
 
 def _cut_tray_contents(named_shapes):
@@ -1732,11 +2082,6 @@ def _tray_tool_category(name):
             return "wire_item"
         return None
     return None
-
-
-# Every piece that gets the tray's outer fillet plus (where cut) its pockets'
-# top-face fillet.
-_FILLET_TARGETS = ("TokenTray", "TokenTrayLid", "WireTray")
 
 
 def _fillet_tray_outer_edges(named_shapes):
