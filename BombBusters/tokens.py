@@ -1106,7 +1106,17 @@ def _pack_row(shapes, gap):
 # bit on one short edge. Column layout for the SecretMissionToken sets
 # themselves, and any leftover-space pocket, are deferred to a follow-up --
 # this is just the shell future SecretMission-bit trays can start from.
-_SECRET_GRAB_RADIUS = 16.0
+#
+# The grab bit's own radius is truncated -- shortened from whatever a roomy
+# grab notch would otherwise want -- down to whatever the general pocket has
+# left once the longest thing this tray will ever hold (a Mission card, laid
+# lengthwise) still fits between the grab wall's own reinforcement
+# (_SECRET_GRAB_WALL, see below) and the tray's far wall.
+_SECRET_GRAB_RADIUS = (
+    cfg.SecretMissionTray["Height"]
+    - 2 * cfg.WALL_THICKNESS  # the grab wall's reinforcement, plus the far wall
+    - (cfg.Card["Mission"]["Height"] + cfg.TOLERANCE * 2)  # the card itself, plus clearance
+)
 # Wall thickness everywhere except the grab point, which needs enough material
 # behind the notch cut (radius _SECRET_GRAB_RADIUS deep) to leave a plain
 # WALL_THICKNESS of wall beyond it.
