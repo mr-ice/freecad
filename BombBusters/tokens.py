@@ -31,6 +31,7 @@ Public API
 """
 
 import math
+import os
 
 import config as cfg
 import Part
@@ -407,6 +408,13 @@ _SECRET_COL_MARGIN = (
 ) / 2
 
 
+_STAND_FONT_CANDIDATES = (
+    "/System/Library/Fonts/Supplemental/Arial.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+)
+
+
 def _secret_mission_stack_length(key):
     """Return one SecretMissionTokens stack's own X length (its stacking dimension).
 
@@ -479,21 +487,6 @@ _FILLET_TARGETS = ("TokenTray", "TokenTrayLid", "WireTray")
 
 
 
-# Each SecretMissionToken stack's own reference copy is placed in world
-# coordinates alongside SecretMissionTokenTray, offset the same as the tray
-# itself (_SECRET_TRAY2_OFFSET) -- done here, after _secret_mission_token_placements
-# is defined, rather than up with the other SecretMission* constants.
-for _smt_name, _smt_local_offset in _secret_mission_token_placements().items():
-    PLACEMENTS[_smt_name] = (_smt_local_offset + _SECRET_TRAY2_OFFSET, None)
-
-
-_populate_info_grid_placements("", _GRID_BLOCK_MIN_X)
-# The Tray_ copy is a set of cutting tools for build_all()'s TokenTray pocket cut
-# (see _cut_tray_contents), so it's placed at the exact same coordinates as the
-# box's own grid -- which line up with the tray once its +X edge is aligned to
-# the box's, below.
-_populate_info_grid_placements("Tray_", _GRID_BLOCK_MIN_X)
-
 # TokenTray's +X edge is aligned with _TOKEN_TRAY_X_MAX (pulled back from the
 # box's own +X edge, see _TOKEN_TRAY_X_SHIFT -- otherwise TokenTrayLid's right
 # leg pokes straight through the box), so it sits directly under the box's own
@@ -508,6 +501,13 @@ PLACEMENTS["TokenTray"] = (Vector(_TOKEN_TRAY_X_MAX - cfg.TokenTray["Height"], 0
 
 # SecretMissionTray sits off on its own, at the height the user asked for.
 PLACEMENTS["SecretMissionTray"] = (Vector(0, 0, 30), None)
+
+# Clear of every other group -- well below the main grid.
+PLACEMENTS["WireStand"] = (Vector(0, -100, 0), None)
+for _letter in cfg.WireStand["Letters"]:
+    PLACEMENTS[f"WireStand_Letter_{_letter}"] = (Vector(0, -100, 0), None)
+for _which in ("Front", "Back"):
+    PLACEMENTS[f"WireStand_Void_{_which}"] = (Vector(0, -100, 0), None)
 
 
 def _populate_info_grid_placements(prefix, block_min_x):
@@ -588,6 +588,14 @@ def _populate_info_grid_placements(prefix, block_min_x):
         Vector(row0_top - _DISC_RADIUS_EFF, disc_y, _ROW0_TOP_Z - _DISC_RADIUS_EFF),
         (Vector(0, 0, 1), 90),
     )
+
+
+_populate_info_grid_placements("", _GRID_BLOCK_MIN_X)
+# The Tray_ copy is a set of cutting tools for build_all()'s TokenTray pocket cut
+# (see _cut_tray_contents), so it's placed at the exact same coordinates as the
+# box's own grid -- which line up with the tray once its +X edge is aligned to
+# the box's, below.
+_populate_info_grid_placements("Tray_", _GRID_BLOCK_MIN_X)
 
 
 def place(shape, offset=None, rotation=None):
@@ -1645,6 +1653,14 @@ def _secret_mission_token_placements():
     return placements
 
 
+# Each SecretMissionToken stack's own reference copy is placed in world
+# coordinates alongside SecretMissionTokenTray, offset the same as the tray
+# itself (_SECRET_TRAY2_OFFSET) -- done here, after _secret_mission_token_placements
+# is defined, rather than up with the other SecretMission* constants.
+for _smt_name, _smt_local_offset in _secret_mission_token_placements().items():
+    PLACEMENTS[_smt_name] = (_smt_local_offset + _SECRET_TRAY2_OFFSET, None)
+
+
 def _secret_mission_pocket1(col):
     """Build one column's pocket 1 cutting tool -- the shallow, token-holding pocket.
 
@@ -1818,6 +1834,265 @@ def build_secret_mission_access_cuts():
     ]
 
 
+def _stand_font_path():
+    """Return the first existing TTF candidate for WireStand letter engraving.
+
+    Returns
+    -------
+    (str, str)
+        ``(font_dir, font_file)``, split the way `Part.makeWireString` wants them.
+    """
+    for path in _STAND_FONT_CANDIDATES:
+        if os.path.exists(path):
+            return os.path.dirname(path) + os.sep, os.path.basename(path)
+    # ponytail: no font shipped with the project; add a path above for your machine.
+    raise FileNotFoundError("No usable TTF font found for WireStand letters")
+
+
+def _wire_stand_wall_geometry(which):
+    """Return one angled side wall's bottom/top corners, tilt, and inward direction.
+
+    Parameters
+    ----------
+    which : str
+        ``"front"`` (the Y=0 side of the base) or ``"back"`` (the Y=Width side).
+
+    Returns
+    -------
+    (FreeCAD.Vector, FreeCAD.Vector, float, FreeCAD.Vector)
+        ``(p0, p1, angle_deg, inward_dir)`` -- `p0`/`p1` are the wall's bottom/top
+        corners (X=0, in the Y-Z cross section); `angle_deg` rotates a letter
+        template (drawn flat, reading up +Y) about the X axis so it reads up the
+        wall's own slope; `inward_dir` is the unit vector, in that same Y-Z plane,
+        pointing from the wall's outer face into the material.
+    """
+    ws = cfg.WireStand
+    vh = ws["VerticalHeight"]
+    if which == "front":
+        p0, p1 = Vector(0, 0, vh), Vector(0, ws["TopMin"], ws["Height"])
+    else:
+        p0, p1 = Vector(0, ws["Width"], vh), Vector(0, ws["TopMax"], ws["Height"])
+    v = p1 - p0
+    length = v.Length
+    angle = math.degrees(math.atan2(v.z, v.y))
+    if which == "front":
+        normal_out = Vector(0, -v.z, v.y) / length
+    else:
+        normal_out = Vector(0, v.z, -v.y) / length
+    return p0, p1, angle, -normal_out
+
+
+def _wire_stand_wall_void(which):
+    """Return the cavity that hollows one angled side down to a `WALL_THICKNESS` shell.
+
+    The cavity's inner boundary is a plane parallel to the wall, offset inward by
+    `config.WALL_THICKNESS`; it's capped before that boundary would drift into the
+    narrow top's own margin (the offset plane runs parallel to the wall, so it
+    drifts sideways as well as inward), so the top plate and its slots stay solid.
+
+    Parameters
+    ----------
+    which : str
+        ``"front"`` or ``"back"``, as in :func:`_wire_stand_wall_geometry`.
+
+    Returns
+    -------
+    Part.Shape
+        A solid to subtract from the WireStand body.
+    """
+    ws = cfg.WireStand
+    p0, p1, angle, inward = _wire_stand_wall_geometry(which)
+    slope_length = (p1 - p0).Length
+    a = p0 + inward * cfg.WALL_THICKNESS
+    b = p1 + inward * cfg.WALL_THICKNESS
+
+    # Cap before the offset boundary's Y drifts into the top plate's own margin
+    # (it runs parallel to the wall, so it drifts sideways as well as inward).
+    boundary_y = ws["TopMin"] if which == "front" else ws["TopMax"]
+    t = (boundary_y - a.y) / (b.y - a.y)
+
+    # A box in the wall's own local frame (X along the stand, Y up the slope from
+    # `a`, Z inward), then rotated/placed to match -- boolean cut trims whatever
+    # of its generous inward reach isn't actually solid.
+    box = Part.makeBox(
+        ws["Length"], t * slope_length, 2 * ws["Width"], Vector(0, 0, -2 * ws["Width"])
+    )
+    return place(box, rotation=(Vector(1, 0, 0), angle), offset=Vector(0, a.y, a.z))
+
+
+def _wire_stand_letter_template(letter, angle, extrude_dir, mirror):
+    """Build one letter as a solid, shaped to sit flush on an angled side wall.
+
+    Parameters
+    ----------
+    letter : str
+        Single character to render.
+    angle : float
+        Degrees to rotate the flat letter (drawn reading up +Y) about the X axis
+        so its "up" direction matches the wall's own slope.
+    extrude_dir : FreeCAD.Vector
+        Unit vector (in the Y-Z plane) to extrude the letter along, from the
+        wall's outer face into the material.
+    mirror : bool
+        Flip the glyph left-right first. A rotation about the X axis only ever
+        moves a point within the Y-Z plane -- it can angle the glyph onto either
+        wall, but can't change which way it reads when viewed from outside. The
+        back wall is viewed facing -Y instead of +Y, i.e. mirror-image left/right
+        from the front wall, so its glyph needs mirroring first to still read
+        correctly (not backward) from outside.
+
+    Returns
+    -------
+    Part.Shape
+        The letter solid, centered on X and on its own up-axis at the origin --
+        :func:`place` positions it against the wall afterward.
+    """
+    ws = cfg.WireStand
+    font_dir, font_file = _stand_font_path()
+    wires = Part.makeWireString(letter, font_dir, font_file, ws["LabelHeight"])[0]
+    face = Part.makeFace(wires, "Part::FaceMakerCheese")
+    if mirror:
+        face = face.mirror(Vector(0, 0, 0), Vector(1, 0, 0))
+    bbox = face.BoundBox
+    face.translate(Vector(-(bbox.XMin + bbox.XMax) / 2, -(bbox.YMin + bbox.YMax) / 2, 0))
+    face.rotate(Vector(0, 0, 0), Vector(1, 0, 0), angle)
+    return face.extrude(extrude_dir * ws["LabelPocketDepth"])
+
+
+def _wire_stand_position_x(i):
+    """Return the X offset of slot position `i`'s left edge (0-indexed)."""
+    ws = cfg.WireStand
+    return (i + 1) * ws["PocketGap"] + i * ws["SlotWidth"]
+
+
+def _wire_stand_letters():
+    """Build the front/back letter solids for every WireStand position.
+
+    Returns
+    -------
+    list of (str, Part.Shape, Part.Shape)
+        ``[(letter, front_solid, back_solid), ...]``, in position order. Each
+        solid is a pocket cut into its own angled side wall, near the top edge
+        (see :func:`_wire_stand_wall_geometry`).
+    """
+    ws = cfg.WireStand
+    geometry = {which: _wire_stand_wall_geometry(which) for which in ("front", "back")}
+    gap = ws["LabelHeight"] / 2 + ws["LabelTopGap"]
+
+    result = []
+    for i, letter in enumerate(ws["Letters"]):
+        x_center = _wire_stand_position_x(i) + ws["SlotWidth"] / 2
+        instances = {}
+        for which, (p0, p1, angle, extrude_dir) in geometry.items():
+            template = _wire_stand_letter_template(letter, angle, extrude_dir, mirror=(which == "back"))
+            up = (p1 - p0) / (p1 - p0).Length
+            anchor = p1 - up * gap
+            instances[which] = place(template, offset=Vector(x_center, anchor.y, anchor.z))
+        result.append((letter, instances["front"], instances["back"]))
+    return result
+
+
+def build_wire_stand_voids():
+    """Build the two angled-side hollowing cavities, for inspection.
+
+    Not meant to be seen -- BombBusters.FCMacro hides ``WireStand_Void_*`` parts
+    on build -- but named and kept out of the cut result so they can be toggled
+    visible in FreeCAD to check the hollowing against the outer shape directly.
+
+    Returns
+    -------
+    list of (str, Part.Shape)
+        ``[("WireStand_Void_Front", shape), ("WireStand_Void_Back", shape)]``
+    """
+    return []
+    return [
+        (f"WireStand_Void_{which.capitalize()}", _wire_stand_wall_void(which))
+        for which in ("front", "back")
+    ]
+
+
+def build_wire_stand():
+    """Build the 14-position WireToken stand, with letter pockets cut in.
+
+    Cross section is a hexagon: full `Width` at the base, a vertical run up to
+    `VerticalHeight`, then angled sides up to a narrow top (`TopWidth`) just
+    wide enough for the slots. The angled sides are hollowed from behind down to
+    a `config.WALL_THICKNESS` shell (see :func:`_wire_stand_wall_void`), to save
+    material. Each position has two `SlotWidth`-wide vertical slots side by side
+    across the narrow top: a back one sized for a WireToken standing on edge,
+    and a front one for an optional InfoToken, both cut down to `Floor` above
+    the base. Positions are labeled A-N on both angled sides, near the top --
+    see :func:`build_wire_stand_letters` for the matching second-color insert.
+
+    Returns
+    -------
+    list of (str, Part.Shape)
+        ``[("WireStand", shape)]``
+    """
+    ws = cfg.WireStand
+    vh = ws["VerticalHeight"]
+    profile = Part.Face(
+        Part.makePolygon(
+            [
+                Vector(0, 0, 0),
+                Vector(0, ws["Width"], 0),
+                Vector(0, ws["Width"], vh),
+                Vector(0, ws["TopMax"], ws["Height"]),
+                Vector(0, ws["TopMin"], ws["Height"]),
+                Vector(0, 0, vh),
+                Vector(0, 0, 0),
+            ]
+        )
+    )
+    body = profile.extrude(Vector(ws["Length"], 0, 0))
+    for _name, void in build_wire_stand_voids():
+        body = body.cut(void)
+
+
+    tools = []
+    y_front = ws["TopMin"] + ws["TopMargin"]
+    y_back = y_front + ws["SlotDepth"] + ws["MiddleWall"]
+    for i in range(ws["Positions"]):
+        x = _wire_stand_position_x(i)
+        tools.append(
+            Part.makeBox(
+                ws["SlotWidth"], ws["SlotDepth"], ws["SlotCutDepth"], Vector(x, y_front, ws["Floor"])
+            )
+        )
+        tools.append(
+            Part.makeBox(
+                ws["SlotWidth"], ws["SlotDepth"], ws["SlotCutDepth"], Vector(x, y_back, ws["Floor"])
+            )
+        )
+    for _letter, front, back in _wire_stand_letters():
+        tools.append(front)
+        tools.append(back)
+
+    cut_tool = tools[0]
+    for tool in tools[1:]:
+        cut_tool = cut_tool.fuse(tool)
+    body = body.cut(cut_tool)
+    return [("WireStand", body)]
+
+
+def build_wire_stand_letters():
+    """Build the 14 letter-insert parts for the WireStand, one per position.
+
+    Each part fuses that position's front and back letter solids into one part
+    for reference -- physically two separate pieces (opposite faces of the
+    stand) that always print and get inserted together.
+
+    Returns
+    -------
+    list of (str, Part.Shape)
+        ``[("WireStand_Letter_A", shape), ..., ("WireStand_Letter_N", shape)]``
+    """
+    return [
+        (f"WireStand_Letter_{letter}", front.fuse(back))
+        for letter, front, back in _wire_stand_letters()
+    ]
+
+
 def build_all():
     """Lay out one of every component group, left to right, for scale reference.
 
@@ -1854,6 +2129,9 @@ def build_all():
         build_secret_mission_tokens(),
         build_secret_mission_token_tray(),
         build_secret_mission_access_cuts(),
+        build_wire_stand(),
+        build_wire_stand_letters(),
+        build_wire_stand_voids(),
     ]
 
     result = []

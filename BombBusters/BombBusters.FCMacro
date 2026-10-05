@@ -42,8 +42,11 @@ doc = App.newDocument(DOC_NAME)
 # Hidden on build: Tray_*/WireTray_* cutting tools (not meant to be seen),
 # WireToken_Blue_* (already has its own bag -- no box planned for it), the
 # box-level InfoToken/InfoMarker/EquipmentToken/BlueCutDisc originals now that
-# their Tray_-prefixed counterparts are actually housed in TokenTray, and
-# Card_Equipment now that Card_Equipment_Double supersedes it.
+# their Tray_-prefixed counterparts are actually housed in TokenTray,
+# Card_Equipment now that Card_Equipment_Double supersedes it, and
+# WireStand_Void_* (the angled-side hollowing cavities -- kept as their own
+# objects, hidden by default, so they can be toggled visible to check the
+# hollowing against WireStand directly).
 _HIDDEN_PREFIXES = (
     "Tray_",
     "WireTray_",
@@ -52,6 +55,7 @@ _HIDDEN_PREFIXES = (
     "InfoMarker_",
     "SecretMissionAccessCut_",
     "SecretMissionToken_",
+    "WireStand_Void_",
 )
 _HIDDEN_NAMES = {
     "EquipmentToken_Pair",
