@@ -1,0 +1,57 @@
+"""FreeCAD macro: build the Dominion bit shapes and bay spaces.
+
+Run inside FreeCAD 1.0.2. Reloads the project's modules, recreates the document from
+scratch, then sets an isometric, fit-all view.
+"""
+
+import importlib
+import os
+import sys
+
+import FreeCAD as App
+import FreeCADGui as Gui
+
+DOC_NAME = "Dominion"
+
+try:
+    _macro_dir = os.path.dirname(os.path.abspath(__file__))
+except NameError:  # __file__ is undefined in some macro contexts
+    _macro_dir = os.getcwd()
+if _macro_dir not in sys.path:
+    sys.path.insert(0, _macro_dir)
+
+import config  # noqa: E402
+
+importlib.reload(config)
+import icons  # noqa: E402
+
+importlib.reload(icons)
+import bits  # noqa: E402
+
+importlib.reload(bits)
+
+if DOC_NAME in App.listDocuments():
+    App.closeDocument(DOC_NAME)
+doc = App.newDocument(DOC_NAME)
+
+for name, shape, is_bay, hidden in bits.build_all():
+    obj = doc.addObject("Part::Feature", name)
+    obj.Shape = shape
+    # Read-only size properties, shown under "Dimensions" in the Property view.
+    bb = shape.BoundBox
+    for prop, value in (("X", bb.XLength), ("Y", bb.YLength), ("Z", bb.ZLength)):
+        obj.addProperty("App::PropertyLength", f"Size{prop}", "Dimensions")
+        setattr(obj, f"Size{prop}", value)
+        obj.setEditorMode(f"Size{prop}", 1)  # 1 = read-only
+    if is_bay and obj.ViewObject is not None:
+        obj.ViewObject.Transparency = config.TRANSPARENCY
+    if obj.ViewObject is not None:
+        for suffix, rgb in config.ICON_COLORS.items():
+            if name.endswith("_" + suffix):
+                obj.ViewObject.ShapeColor = rgb
+    if hidden and obj.ViewObject is not None:
+        obj.ViewObject.Visibility = False
+
+doc.recompute()
+Gui.activeDocument().activeView().viewIsometric()
+Gui.SendMsgToActiveView("ViewFit")

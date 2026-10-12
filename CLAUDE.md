@@ -60,3 +60,5 @@ together with this file. Add new projects to this list as they gain a `PROJECT.m
   with a two-part sliding/dispensing lid and an integrated folding stand.
 - [BombBusters](BombBusters/PROJECT.md) — reference geometry for BombBusters game
   components (tokens, markers, discs, cards) and the box envelope, for layout planning.
+- [Game Insert/Dominion](Game%20Insert/Dominion/PROJECT.md) — vertical-extraction bit boxes
+  for Dominion components that fit the two spare bay spaces in the game boxes.
